@@ -18,12 +18,12 @@ jobs:
     
     strategy:
       matrix:
-        openwrt_version: ['23.05.6', '24.10.6', '25.12.2']
+        openwrt_version: ['23.05.6', '24.10.6', '25.12.1']
         target: ['ramips/mt76x8', 'x86/64']
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
     
@@ -37,7 +37,7 @@ jobs:
           file wget curl jq
     
     - name: Cache OpenWrt SDK
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: openwrt-sdk
         key: openwrt-sdk-${{ matrix.openwrt_version }}-${{ matrix.target }}
@@ -60,7 +60,7 @@ jobs:
             GCC_VERSION="14.2.0"
             ;;
           *)
-            GCC_VERSION="13.3.0"  # Default fallback
+            GCC_VERSION="14.2.0"  # Default to latest
             ;;
         esac
         
@@ -175,7 +175,7 @@ jobs:
         done < ../package-list.txt
     
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: notapollo-${{ matrix.openwrt_version }}-${{ matrix.target }}
         path: artifacts/*.ipk
@@ -194,7 +194,7 @@ jobs:
         done
     
     - name: Upload package info
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: package-info-${{ matrix.openwrt_version }}-${{ matrix.target }}
         path: package-info.txt
@@ -206,7 +206,7 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     
     - name: Create installation script
       run: |
@@ -268,7 +268,7 @@ jobs:
         
         # Download package from GitHub releases
         download_package() {
-            local github_repo="YOUR_GITHUB_USERNAME/notapollo"
+            local github_repo="Lyceris-chan/notApollo"
             local release_url="https://api.github.com/repos/$github_repo/releases/latest"
             
             log_info "Fetching latest release information..."
@@ -547,7 +547,7 @@ jobs:
             echo "notApollo has been removed from your system."
             echo ""
             echo "If you want to reinstall notApollo later:"
-            echo "  wget -O - https://raw.githubusercontent.com/YOUR_USERNAME/notapollo/main/install-notapollo.sh | sh"
+            echo "  wget -O - https://raw.githubusercontent.com/Lyceris-chan/notApollo/main/install-notapollo.sh | sh"
             echo ""
             echo "Or download and run the installation script manually."
         }
@@ -592,7 +592,7 @@ jobs:
         chmod +x uninstall-notapollo.sh
     
     - name: Upload installation scripts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: installation-scripts
         path: |
@@ -607,10 +607,10 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     
     - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         path: artifacts
     
@@ -650,7 +650,7 @@ jobs:
         ### Package Files
         - **notapollo_*-23.05.6-*.ipk**: For OpenWrt 23.05.x
         - **notapollo_*-24.10.6-*.ipk**: For OpenWrt 24.10.x  
-        - **notapollo_*-25.12.2-*.ipk**: For OpenWrt 25.12.x (latest)
+        - **notapollo_*-25.12.1-*.ipk**: For OpenWrt 25.12.x (latest)
         - **install-notapollo.sh**: Automatic installation script
         - **uninstall-notapollo.sh**: Uninstallation script
         - **checksums.txt**: SHA256 checksums for verification
@@ -676,8 +676,8 @@ jobs:
         - Local asset serving (offline capable)
         
         ## Requirements
-        - OpenWrt 22.03+ (tested on 23.05.4 and 24.10.0)
-        - ASUS RT-AX53U or compatible router
+        - OpenWrt 23.05+ (tested on 23.05.6, 24.10.6, and 25.12.1)
+        - Compatible router with sufficient resources
         - Minimum 32MB flash storage
         - Minimum 128MB RAM
         
@@ -688,7 +688,7 @@ jobs:
         EOF
     
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       with:
         files: release-assets/*
         body_path: release-notes.md
@@ -704,7 +704,7 @@ jobs:
     
     steps:
     - name: Download installation scripts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: installation-scripts
     

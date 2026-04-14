@@ -1,21 +1,26 @@
 # notApollo Network Diagnostic Tool
 
-A comprehensive network diagnostic webpage for OpenWrt routers, specifically designed for ASUS RT-AX53U with dual-network configuration. Features Material 3 design, real-time monitoring, and user-friendly diagnostics across all network layers.
+A comprehensive network diagnostic web interface for OpenWrt routers featuring Material 3 2026 design, real-time monitoring, and universal network compatibility. Provides user-friendly diagnostics across all network layers with responsive design optimized for any device.
 
 ## Overview
 
-notApollo provides real-time network diagnostics accessible from both primary (192.168.69.x) and isolated guest (192.168.70.x) networks. The system monitors everything from physical ONT/fiber connectivity to application-layer services, presenting information in plain language that anyone can understand.
+notApollo is a production-ready network diagnostic tool that automatically adapts to any OpenWrt router configuration. It provides real-time network diagnostics with an intuitive Material 3 2026 compliant interface, comprehensive monitoring capabilities, and offline operation through local asset bundling.
 
 ### Key Features
 
-- **Dual Network Access**: Works from both network segments simultaneously
-- **Material 3 Design**: Modern, responsive interface optimized for mobile devices
-- **Local-Only Operation**: No external dependencies, works offline
-- **Real-Time Monitoring**: Live updates with intelligent caching
-- **User-Friendly Language**: Technical information presented in plain English
-- **Comprehensive Diagnostics**: Covers all network layers from fiber to applications
-- **Smart DNS Monitoring**: Optimized for NextDNS with cache integration
-- **Safe Router Control**: Reboot functionality with safety countdown
+- **🌐 Universal Network Compatibility**: Auto-detects and works with any OpenWrt router setup
+- **🎨 Material 3 2026 Design**: Latest Material Design system with responsive breakpoints
+- **📱 Mobile-First Responsive**: Optimized for all screen sizes (xs: 0-599px to xl: 1536px+)
+- **🔒 Local-Only Operation**: No external dependencies, works completely offline
+- **⚡ Real-Time Monitoring**: Live updates with intelligent caching and performance optimization
+- **🗣️ User-Friendly Language**: Technical information presented in plain English
+- **📊 Comprehensive Diagnostics**: Covers all network layers from physical to application
+- **🔍 Smart DNS Monitoring**: Advanced DNS analysis with cache optimization
+- **🛡️ Safe Router Control**: Secure reboot functionality with safety confirmations
+- **♿ Accessibility Compliant**: WCAG guidelines with 48px touch targets and proper contrast
+- **🎯 No-Scroll Dashboard**: Everything visible without scrolling on any device
+- **📈 Historical Analytics**: Time-series data with Chart.js visualization
+- **🔧 Production Ready**: Clean, optimized code with comprehensive error handling
 
 ## Quick Start
 
@@ -25,7 +30,7 @@ The easiest way to install notApollo is using our automatic installation script:
 
 ```bash
 # Download and run the installation script
-wget -O - https://raw.githubusercontent.com/YOUR_USERNAME/notapollo/main/install-notapollo.sh | sh
+wget -O - https://raw.githubusercontent.com/Lyceris-chan/notApollo/main/install-notapollo.sh | sh
 ```
 
 This script will:
@@ -39,7 +44,7 @@ This script will:
 #### Option 1: Pre-built Packages
 
 1. **Download the package:**
-   - Go to [Releases](https://github.com/YOUR_USERNAME/notapollo/releases)
+   - Go to [Releases](https://github.com/Lyceris-chan/notApollo/releases)
    - Download the `.ipk` file matching your OpenWrt version and architecture
 
 2. **Install the package:**
@@ -78,7 +83,7 @@ To completely remove notApollo from your system:
 
 ```bash
 # Download and run the uninstallation script
-wget -O - https://raw.githubusercontent.com/YOUR_USERNAME/notapollo/main/uninstall-notapollo.sh | sh
+wget -O - https://raw.githubusercontent.com/Lyceris-chan/notApollo/main/uninstall-notapollo.sh | sh
 ```
 
 Or manually:
@@ -103,8 +108,8 @@ rm -f /etc/uhttpd/notapollo
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/notapollo.git
-   cd notapollo
+   git clone https://github.com/Lyceris-chan/notApollo.git
+   cd notApollo
    ```
 
 2. **Set up local development:**
@@ -123,7 +128,7 @@ rm -f /etc/uhttpd/notapollo
 
 This project uses GitHub Actions to automatically build packages for multiple OpenWrt versions and architectures:
 
-- **Supported OpenWrt versions:** 23.05.4, 24.10.0
+- **Supported OpenWrt versions:** 23.05.6, 24.10.6, 25.12.1 (latest)
 - **Supported architectures:** ramips/mt76x8, x86/64
 - **Automatic releases:** Tagged commits create GitHub releases with pre-built packages
 - **Installation scripts:** Automatic and manual installation scripts are generated
@@ -175,28 +180,36 @@ The build process:
 
 ### Network Diagnostics
 
-- **System Health**: Uptime, reboot tracking, configuration monitoring
-- **WAN/Internet**: Link state, connectivity, latency, packet loss monitoring
-- **WiFi/Radio**: Multi-band monitoring, client tracking, signal analysis
-- **Router Health**: CPU, memory, temperature, process monitoring
-- **ONT/Fiber**: Guided LED status checking, connectivity testing
-- **DNS Services**: Dual-network monitoring with cache optimization
+- **🏠 System Health**: Uptime tracking, reboot monitoring, configuration validation
+- **🌐 WAN/Internet**: Link state analysis, connectivity testing, latency monitoring, packet loss detection
+- **📡 WiFi/Radio**: Multi-band monitoring, client tracking, signal strength analysis, interference detection
+- **🖥️ Router Health**: CPU usage, memory utilization, temperature monitoring, process tracking
+- **🔌 ONT/Fiber**: Guided LED status checking, connectivity testing, fiber diagnostics
+- **🔍 DNS Services**: Universal DNS monitoring with cache optimization and performance analysis
+- **📊 Network Performance**: Bandwidth monitoring, throughput analysis, connection quality metrics
+- **🔒 Security Monitoring**: Connection tracking, firewall status, intrusion detection alerts
 
 ### User Experience
 
-- **Material 3 Interface**: Dark theme default with responsive design
-- **Real-Time Updates**: Live data with Server-Sent Events
-- **Interactive Charts**: Time-series visualization with Chart.js
-- **Mobile Optimized**: Touch-friendly interface for all devices
-- **Plain Language**: Technical information in user-friendly terms
+- **🎨 Material 3 2026 Interface**: Latest design system with dynamic color theming
+- **📱 Responsive Design**: Optimized breakpoints (xs: 0-599px to xl: 1536px+)
+- **⚡ Real-Time Updates**: Live data with Server-Sent Events and intelligent caching
+- **📈 Interactive Charts**: Time-series visualization with Chart.js and historical trends
+- **🎯 No-Scroll Dashboard**: Everything visible without scrolling on any device size
+- **♿ Accessibility Compliant**: WCAG guidelines with proper contrast and 48px touch targets
+- **🗣️ Plain Language**: Technical information presented in user-friendly terms
+- **🌙 Dark Theme**: Material 3 dark theme optimized for low-light usage
 
 ### Advanced Features
 
-- **Cross-Layer Intelligence**: Correlates issues across network layers
-- **Smart Caching**: DNS query optimization with cache integration
-- **Safety Controls**: Router reboot with 5-second confirmation countdown
-- **ONT Guidance**: Step-by-step fiber troubleshooting instructions
-- **Performance Monitoring**: Historical trends and baseline comparison
+- **🧠 Cross-Layer Intelligence**: Correlates issues across network layers for root cause analysis
+- **⚡ Smart Caching**: DNS query optimization with intelligent cache integration
+- **🛡️ Safety Controls**: Router reboot with 5-second confirmation countdown and safety checks
+- **🔌 ONT Guidance**: Step-by-step fiber troubleshooting with visual LED status guide
+- **📊 Performance Analytics**: Historical trends, baseline comparison, and anomaly detection
+- **🔄 Auto-Discovery**: Universal network detection that works with any OpenWrt setup
+- **💾 Local Asset Serving**: Complete offline operation with bundled fonts, icons, and libraries
+- **🔧 Production Ready**: Comprehensive error handling, input validation, and security measures
 
 ## Development
 

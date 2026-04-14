@@ -121,6 +121,12 @@ monolith.sh
 config.sh
 setup.sh
 
+# Archive files
+master.zip
+master.tar.gz
+*.zip
+*.tar.gz
+
 # Local testing and development
 test-results/
 .test-output/
