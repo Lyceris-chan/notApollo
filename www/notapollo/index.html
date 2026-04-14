@@ -2,160 +2,409 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="notApollo Network Diagnostic Tool for OpenWrt">
-    <title>notApollo - Network Diagnostics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#6750a4" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#315f99" media="(prefers-color-scheme: light)">
+    <meta name="description" content="notApollo Network Diagnostic Tool - Real-time network monitoring for OpenWrt routers with Material 3 design">
+    <meta name="color-scheme" content="dark light">
+    <title>notApollo Network Diagnostics</title>
     
-    <!-- Material 3 Styles -->
+    <!-- Material 3 Design System -->
+    <link rel="stylesheet" href="fonts/google-sans-flex/fonts.css">
+    <link rel="stylesheet" href="icons/material-symbols/icons.css">
     <link rel="stylesheet" href="css/material3.css">
     <link rel="stylesheet" href="css/app.css">
     
-    <!-- Preload critical resources -->
-    <link rel="preload" href="fonts/google-sans-flex/GoogleSansFlex-Regular.woff2" as="font" type="font/woff2" crossorigin>
-    
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#101418">
+    <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
-    <link rel="icon" type="image/png" href="icons/favicon-32x32.png">
+    <!-- Preload Critical Resources -->
+    <link rel="preload" href="js/lib/chart.min.js" as="script">
+    <link rel="preload" href="js/app.js" as="script">
+    <link rel="preload" href="fonts/google-sans-flex/GoogleSansFlex-Regular.woff2" as="font" type="font/woff2" crossorigin>
 </head>
-<body>
-    <!-- App Shell -->
-    <header class="app-bar">
-        <h1 class="app-title">notApollo</h1>
-        <div class="app-subtitle">Network Diagnostics</div>
+<body class="md3-theme-dark">
+    <!-- Skip Link for Accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <!-- Material 3 Top App Bar -->
+    <header class="md3-top-app-bar" role="banner">
+        <div class="md3-top-app-bar-leading">
+            <button class="md3-icon-button" id="menu-button" aria-label="Open navigation menu" aria-expanded="false">
+                <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+            </button>
+            <h1 class="md3-top-app-bar-title">notApollo</h1>
+        </div>
+        
+        <div class="md3-top-app-bar-trailing">
+            <!-- Network Indicator -->
+            <div class="network-indicator" id="network-indicator" role="status" aria-live="polite">
+                <span class="material-symbols-outlined" aria-hidden="true">wifi</span>
+                <span class="network-name" id="network-name">Detecting...</span>
+            </div>
+            
+            <!-- Last Updated Indicator -->
+            <div class="update-indicator" id="update-indicator" role="status" aria-live="polite">
+                <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+                <span class="update-time" id="update-time">--</span>
+            </div>
+            
+            <!-- Settings Button -->
+            <button class="md3-icon-button" id="settings-button" aria-label="Open settings">
+                <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+            </button>
+        </div>
     </header>
 
-    <main class="container">
-        <!-- Diagnostic Cards Grid -->
-        <section class="diagnostic-grid">
+    <!-- Main Dashboard -->
+    <main class="md3-dashboard" role="main" id="main-content">
+        <!-- System Overview Cards -->
+        <section class="md3-overview-grid" aria-label="System Overview">
             <!-- System Health Card -->
-            <div class="diagnostic-card" id="system-card">
-                <h2 class="card-title">System Health</h2>
-                <div class="status-indicator" id="system-status">
-                    <span class="status-icon">🟢</span>
-                    <span class="status-text">Healthy</span>
+            <article class="md3-diagnostic-card" id="system-card">
+                <header class="md3-card-header">
+                    <h2 class="md3-card-title">System Health</h2>
+                    <div class="md3-status-chip" id="system-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Loading...</span>
+                    </div>
+                </header>
+                
+                <div class="md3-chart-container">
+                    <canvas id="system-chart" aria-label="System health overview chart"></canvas>
+                    <div class="chart-overlay" id="system-overlay">
+                        <span id="system-score">--</span>
+                    </div>
                 </div>
-                <div class="card-content" id="system-details">
-                    <!-- System details will be populated by JavaScript -->
+                
+                <div class="md3-card-metrics">
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="uptime-value">--</span>
+                        <span class="md3-metric-label">Uptime</span>
+                    </div>
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="reboots-value">--</span>
+                        <span class="md3-metric-label">Reboots (24h)</span>
+                    </div>
                 </div>
-            </div>
+                
+                <div class="trend-indicator" id="system-trend">
+                    <span class="trend-arrow">→</span>
+                    <span class="trend-text">Stable</span>
+                </div>
+            </article>
 
             <!-- WAN/Internet Card -->
-            <div class="diagnostic-card" id="wan-card">
-                <h2 class="card-title">Internet Connection</h2>
-                <div class="status-indicator" id="wan-status">
-                    <span class="status-icon">🟡</span>
-                    <span class="status-text">Checking...</span>
+            <article class="md3-diagnostic-card" id="wan-card">
+                <header class="md3-card-header">
+                    <h2 class="md3-card-title">Internet Connection</h2>
+                    <div class="md3-status-chip" id="wan-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Loading...</span>
+                    </div>
+                </header>
+                
+                <div class="md3-chart-container">
+                    <canvas id="wan-chart" aria-label="Internet latency trend chart"></canvas>
                 </div>
-                <div class="card-content" id="wan-details">
-                    <!-- WAN details will be populated by JavaScript -->
+                
+                <div class="md3-card-metrics">
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="latency-value">--</span>
+                        <span class="md3-metric-label">Latency</span>
+                    </div>
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="packet-loss-value">--</span>
+                        <span class="md3-metric-label">Packet Loss</span>
+                    </div>
                 </div>
-            </div>
+                
+                <div class="trend-indicator" id="wan-trend">
+                    <span class="trend-arrow">→</span>
+                    <span class="trend-text">Stable</span>
+                </div>
+            </article>
 
             <!-- WiFi Radio Card -->
-            <div class="diagnostic-card" id="wifi-card">
-                <h2 class="card-title">WiFi Networks</h2>
-                <div class="status-indicator" id="wifi-status">
-                    <span class="status-icon">🟢</span>
-                    <span class="status-text">Active</span>
+            <article class="md3-diagnostic-card" id="wifi-card">
+                <header class="md3-card-header">
+                    <h2 class="md3-card-title">WiFi Networks</h2>
+                    <div class="md3-status-chip" id="wifi-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Loading...</span>
+                    </div>
+                </header>
+                
+                <div class="md3-chart-container">
+                    <canvas id="wifi-chart" aria-label="WiFi client distribution chart"></canvas>
                 </div>
-                <div class="card-content" id="wifi-details">
-                    <!-- WiFi details will be populated by JavaScript -->
+                
+                <div class="md3-card-metrics">
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="wifi-clients-value">--</span>
+                        <span class="md3-metric-label">Connected</span>
+                    </div>
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="wifi-signal-value">--</span>
+                        <span class="md3-metric-label">Avg Signal</span>
+                    </div>
                 </div>
-            </div>
+                
+                <div class="trend-indicator" id="wifi-trend">
+                    <span class="trend-arrow">→</span>
+                    <span class="trend-text">Stable</span>
+                </div>
+            </article>
 
             <!-- Router Health Card -->
-            <div class="diagnostic-card" id="router-card">
-                <h2 class="card-title">Router Performance</h2>
-                <div class="status-indicator" id="router-status">
-                    <span class="status-icon">🟢</span>
-                    <span class="status-text">Normal</span>
+            <article class="md3-diagnostic-card" id="router-card">
+                <header class="md3-card-header">
+                    <h2 class="md3-card-title">Router Resources</h2>
+                    <div class="md3-status-chip" id="router-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Loading...</span>
+                    </div>
+                </header>
+                
+                <div class="md3-chart-container">
+                    <canvas id="router-chart" aria-label="Router resource usage chart"></canvas>
                 </div>
-                <div class="card-content" id="router-details">
-                    <!-- Router details will be populated by JavaScript -->
+                
+                <div class="md3-card-metrics">
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="cpu-value">--</span>
+                        <span class="md3-metric-label">CPU</span>
+                    </div>
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="memory-value">--</span>
+                        <span class="md3-metric-label">Memory</span>
+                    </div>
                 </div>
-            </div>
-
-            <!-- ONT/Fiber Card -->
-            <div class="diagnostic-card" id="ont-card">
-                <h2 class="card-title">Fiber Connection</h2>
-                <div class="status-indicator" id="ont-status">
-                    <span class="status-icon">🟢</span>
-                    <span class="status-text">Connected</span>
+                
+                <div class="trend-indicator" id="router-trend">
+                    <span class="trend-arrow">→</span>
+                    <span class="trend-text">Normal</span>
                 </div>
-                <div class="card-content" id="ont-details">
-                    <!-- ONT details will be populated by JavaScript -->
-                </div>
-            </div>
+            </article>
 
             <!-- DNS Services Card -->
-            <div class="diagnostic-card" id="dns-card">
-                <h2 class="card-title">DNS Services</h2>
-                <div class="status-indicator" id="dns-status">
-                    <span class="status-icon">🟢</span>
-                    <span class="status-text">Working</span>
+            <article class="md3-diagnostic-card" id="dns-card">
+                <header class="md3-card-header">
+                    <h2 class="md3-card-title">DNS Services</h2>
+                    <div class="md3-status-chip" id="dns-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Loading...</span>
+                    </div>
+                </header>
+                
+                <div class="md3-chart-container">
+                    <canvas id="dns-chart" aria-label="DNS response time chart"></canvas>
                 </div>
-                <div class="card-content" id="dns-details">
-                    <!-- DNS details will be populated by JavaScript -->
+                
+                <div class="md3-card-metrics">
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="dns-response-value">--</span>
+                        <span class="md3-metric-label">Response</span>
+                    </div>
+                    <div class="md3-metric">
+                        <span class="md3-metric-value" id="dns-cache-value">--</span>
+                        <span class="md3-metric-label">Cache Hit</span>
+                    </div>
                 </div>
-            </div>
+                
+                <div class="trend-indicator" id="dns-trend">
+                    <span class="trend-arrow">→</span>
+                    <span class="trend-text">Optimal</span>
+                </div>
+            </article>
         </section>
 
-        <!-- Router Control Section -->
-        <section class="control-section">
-            <div class="control-card">
-                <h2 class="card-title">Router Control</h2>
-                <div class="control-content">
-                    <button class="restart-button" id="restart-btn">
-                        Restart Router
+        <!-- Detailed Analytics Section -->
+        <section class="md3-details-grid" aria-label="Detailed Analytics">
+            <!-- Network Performance Analytics -->
+            <article class="md3-section-card" id="network-performance">
+                <header>
+                    <h2 class="md3-section-title">Network Performance</h2>
+                    <div class="section-controls">
+                        <button class="md3-icon-button" id="network-timeframe" aria-label="Change timeframe">
+                            <span class="material-symbols-outlined">schedule</span>
+                        </button>
+                    </div>
+                </header>
+                
+                <div class="md3-chart-container detailed">
+                    <canvas id="network-performance-chart" aria-label="Detailed network performance chart"></canvas>
+                </div>
+                
+                <div class="performance-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">Avg Latency (24h)</span>
+                        <span class="summary-value" id="avg-latency-24h">--</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Downtime Events</span>
+                        <span class="summary-value" id="downtime-events">--</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Peak Usage</span>
+                        <span class="summary-value" id="peak-usage">--</span>
+                    </div>
+                </div>
+            </article>
+
+            <!-- System Resources Analytics -->
+            <article class="md3-section-card" id="system-resources">
+                <header>
+                    <h2 class="md3-section-title">System Resources</h2>
+                    <div class="section-controls">
+                        <button class="md3-icon-button" id="resources-timeframe" aria-label="Change timeframe">
+                            <span class="material-symbols-outlined">schedule</span>
+                        </button>
+                    </div>
+                </header>
+                
+                <div class="md3-chart-container detailed">
+                    <canvas id="system-resources-chart" aria-label="System resources over time chart"></canvas>
+                </div>
+                
+                <div class="performance-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">Peak CPU</span>
+                        <span class="summary-value" id="peak-cpu">--</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Memory Pressure</span>
+                        <span class="summary-value" id="memory-pressure">--</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Temperature</span>
+                        <span class="summary-value" id="temperature">--</span>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Control Panel & Guidance -->
+            <article class="md3-section-card" id="control-panel">
+                <header>
+                    <h2 class="md3-section-title">Router Controls</h2>
+                </header>
+                
+                <!-- Router Restart Section -->
+                <div class="control-section">
+                    <h3 class="control-title">System Control</h3>
+                    <div class="safety-message" id="safety-message">
+                        <span class="material-symbols-outlined">info</span>
+                        <span>Restarting will temporarily disconnect all devices</span>
+                    </div>
+                    
+                    <button class="md3-fab" id="restart-button" aria-label="Restart router">
+                        <span class="material-symbols-outlined">restart_alt</span>
+                        <span class="fab-label">Restart Router</span>
                     </button>
-                    <div class="safety-message">
-                        This will restart your router and temporarily disconnect all devices
+                    
+                    <div class="restart-countdown" id="restart-countdown" style="display: none;">
+                        <div class="countdown-text">Think carefully... restarting in</div>
+                        <div class="countdown-timer" id="countdown-timer">5</div>
+                        <div class="countdown-subtext">seconds</div>
                     </div>
-                    <div class="restart-status" id="restart-status" style="display: none;">
-                        <!-- Restart progress will be shown here -->
+                    
+                    <div class="restart-progress" id="restart-progress" style="display: none;">
+                        <div class="progress-text" id="progress-text">Preparing restart...</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-time" id="progress-time">Estimated: 2 minutes</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="control-card">
-                <h2 class="card-title">ONT Guidance</h2>
-                <div class="ont-guidance" id="ont-guidance">
-                    <!-- ONT guidance content will be populated by JavaScript -->
+                <!-- ONT Guidance Section -->
+                <div class="control-section" id="ont-guidance">
+                    <h3 class="control-title">Fiber Connection</h3>
+                    <div class="ont-status" id="ont-status">
+                        <div class="ont-led-row">
+                            <span class="ont-led-indicator ont-led-power" id="ont-power-led"></span>
+                            <span class="ont-led-label">Power: <span id="ont-power-status">Good</span></span>
+                        </div>
+                        <div class="ont-led-row">
+                            <span class="ont-led-indicator ont-led-fiber" id="ont-fiber-led"></span>
+                            <span class="ont-led-label">Fiber: <span id="ont-fiber-status">Connected</span></span>
+                        </div>
+                        <div class="ont-led-row">
+                            <span class="ont-led-indicator ont-led-ethernet" id="ont-ethernet-led"></span>
+                            <span class="ont-led-label">Ethernet: <span id="ont-ethernet-status">Active</span></span>
+                        </div>
+                        <div class="ont-led-row">
+                            <span class="ont-led-indicator ont-led-internet" id="ont-internet-led"></span>
+                            <span class="ont-led-label">Internet: <span id="ont-internet-status">Online</span></span>
+                        </div>
+                    </div>
+                    
+                    <button class="md3-button-outlined" id="ont-troubleshoot" style="display: none;">
+                        <span class="material-symbols-outlined">help</span>
+                        <span>Troubleshoot Fiber</span>
+                    </button>
                 </div>
-            </div>
-        </section>
 
-        <!-- Charts Section -->
-        <section class="charts-section">
-            <div class="chart-card">
-                <h2 class="card-title">Network Performance</h2>
-                <div class="chart-container">
-                    <canvas id="latency-chart"></canvas>
+                <!-- Health Summary -->
+                <div class="control-section">
+                    <h3 class="control-title">Health Summary</h3>
+                    <div class="health-summary" id="health-summary">
+                        <div class="health-score-display">
+                            <div class="health-score-number" id="overall-health-score">--</div>
+                            <div class="health-score-label">Overall Health</div>
+                        </div>
+                        
+                        <div class="health-breakdown">
+                            <div class="health-item">
+                                <span class="health-category">Internet</span>
+                                <span class="health-value" id="internet-health">--</span>
+                            </div>
+                            <div class="health-item">
+                                <span class="health-category">WiFi</span>
+                                <span class="health-value" id="wifi-health">--</span>
+                            </div>
+                            <div class="health-item">
+                                <span class="health-category">System</span>
+                                <span class="health-value" id="system-health">--</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-
-            <div class="chart-card">
-                <h2 class="card-title">DNS Response Times</h2>
-                <div class="chart-container">
-                    <canvas id="dns-chart"></canvas>
-                </div>
-            </div>
+            </article>
         </section>
     </main>
 
-    <!-- Loading Indicator -->
-    <div class="loading-overlay" id="loading">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">Loading diagnostics...</div>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading network diagnostics...</div>
+        </div>
+    </div>
+
+    <!-- Error Snackbar -->
+    <div class="md3-snackbar" id="error-snackbar" role="alert" aria-live="polite">
+        <div class="snackbar-content">
+            <span class="material-symbols-outlined">error</span>
+            <span class="snackbar-text" id="error-text">Connection error</span>
+        </div>
+        <button class="md3-icon-button" id="dismiss-error" aria-label="Dismiss">
+            <span class="material-symbols-outlined">close</span>
+        </button>
     </div>
 
     <!-- Scripts -->
-    <script src="js/chart.min.js"></script>
+    <script src="js/lib/chart.min.js"></script>
     <script src="js/diagnostics.js"></script>
+    <script src="js/charts.js"></script>
     <script src="js/app.js"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
 </body>
 </html>

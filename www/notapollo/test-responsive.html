@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#6750a4" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#315f99" media="(prefers-color-scheme: light)">
+    <meta name="color-scheme" content="dark light">
+    <title>notApollo Responsive Design Test</title>
+    
+    <!-- Material 3 Design System -->
+    <link rel="stylesheet" href="css/material3.css">
+    <link rel="stylesheet" href="css/app.css">
+    
+    <style>
+        /* Test-specific styles */
+        .test-section {
+            margin: var(--md-sys-spacing-6) 0;
+            padding: var(--md-sys-spacing-4);
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--md-sys-shape-corner-medium);
+        }
+        
+        .test-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--md-sys-color-primary);
+            margin-bottom: var(--md-sys-spacing-4);
+        }
+        
+        .breakpoint-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            padding: 8px 12px;
+            border-radius: var(--md-sys-shape-corner-small);
+            font-size: 0.75rem;
+            font-weight: 500;
+            z-index: 1000;
+        }
+        
+        .touch-target-test {
+            display: flex;
+            gap: var(--md-sys-spacing-2);
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .grid-test {
+            display: grid;
+            gap: var(--md-sys-spacing-4);
+            margin: var(--md-sys-spacing-4) 0;
+        }
+        
+        .grid-item {
+            background: var(--md-sys-color-surface-container-high);
+            padding: var(--md-sys-spacing-4);
+            border-radius: var(--md-sys-shape-corner-small);
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Responsive grid test */
+        .responsive-grid-test {
+            grid-template-columns: 1fr;
+        }
+        
+        @media (min-width: 600px) {
+            .responsive-grid-test {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (min-width: 900px) {
+            .responsive-grid-test {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        @media (min-width: 1200px) {
+            .responsive-grid-test {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        @media (min-width: 1536px) {
+            .responsive-grid-test {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+    </style>
+</head>
+<body class="md3-theme-dark">
+    <!-- Breakpoint Indicator -->
+    <div class="breakpoint-indicator" id="breakpoint-indicator">
+        <span id="current-breakpoint">Loading...</span>
+    </div>
+
+    <!-- Skip Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <!-- Header -->
+    <header class="md3-top-app-bar">
+        <div class="md3-top-app-bar-leading">
+            <button class="md3-icon-button" aria-label="Menu">
+                <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+            </button>
+            <h1 class="md3-top-app-bar-title">Responsive Design Test</h1>
+        </div>
+        
+        <div class="md3-top-app-bar-trailing">
+            <button class="md3-icon-button" aria-label="Settings">
+                <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="md3-dashboard" id="main-content">
+        <!-- Touch Target Test -->
+        <section class="test-section">
+            <h2 class="test-title">Touch Target Test (Minimum 48px)</h2>
+            <div class="touch-target-test">
+                <button class="md3-button md3-button-filled">Button</button>
+                <button class="md3-button md3-button-outlined">Outlined</button>
+                <button class="md3-button md3-button-text">Text</button>
+                <button class="md3-icon-button" aria-label="Icon">
+                    <span class="material-symbols-outlined">favorite</span>
+                </button>
+                <button class="md3-fab" aria-label="FAB">
+                    <span class="material-symbols-outlined">add</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Responsive Grid Test -->
+        <section class="test-section">
+            <h2 class="test-title">Responsive Grid Test</h2>
+            <div class="grid-test responsive-grid-test">
+                <div class="grid-item">Item 1</div>
+                <div class="grid-item">Item 2</div>
+                <div class="grid-item">Item 3</div>
+                <div class="grid-item">Item 4</div>
+                <div class="grid-item">Item 5</div>
+            </div>
+        </section>
+
+        <!-- Overview Cards Test -->
+        <section class="test-section">
+            <h2 class="test-title">Overview Cards (Material 3 Layout)</h2>
+            <div class="md3-overview-grid">
+                <article class="md3-diagnostic-card">
+                    <header class="md3-card-header">
+                        <h3 class="md3-card-title">System Health</h3>
+                        <div class="md3-status-chip healthy">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Healthy</span>
+                        </div>
+                    </header>
+                    <div class="md3-chart-container">
+                        <div style="background: var(--md-sys-color-primary); height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-primary);">
+                            Chart Area
+                        </div>
+                    </div>
+                    <div class="md3-card-metrics">
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">99%</span>
+                            <span class="md3-metric-label">Uptime</span>
+                        </div>
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">0</span>
+                            <span class="md3-metric-label">Issues</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="md3-diagnostic-card">
+                    <header class="md3-card-header">
+                        <h3 class="md3-card-title">Internet</h3>
+                        <div class="md3-status-chip degraded">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Degraded</span>
+                        </div>
+                    </header>
+                    <div class="md3-chart-container">
+                        <div style="background: var(--md-sys-color-secondary); height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-secondary-container);">
+                            Chart Area
+                        </div>
+                    </div>
+                    <div class="md3-card-metrics">
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">25ms</span>
+                            <span class="md3-metric-label">Latency</span>
+                        </div>
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">0.1%</span>
+                            <span class="md3-metric-label">Loss</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="md3-diagnostic-card">
+                    <header class="md3-card-header">
+                        <h3 class="md3-card-title">WiFi</h3>
+                        <div class="md3-status-chip healthy">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Healthy</span>
+                        </div>
+                    </header>
+                    <div class="md3-chart-container">
+                        <div style="background: var(--md-sys-color-tertiary); height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-tertiary-container);">
+                            Chart Area
+                        </div>
+                    </div>
+                    <div class="md3-card-metrics">
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">8</span>
+                            <span class="md3-metric-label">Clients</span>
+                        </div>
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">-45dBm</span>
+                            <span class="md3-metric-label">Signal</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="md3-diagnostic-card">
+                    <header class="md3-card-header">
+                        <h3 class="md3-card-title">Router</h3>
+                        <div class="md3-status-chip healthy">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Healthy</span>
+                        </div>
+                    </header>
+                    <div class="md3-chart-container">
+                        <div style="background: var(--chart-success); height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white;">
+                            Chart Area
+                        </div>
+                    </div>
+                    <div class="md3-card-metrics">
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">15%</span>
+                            <span class="md3-metric-label">CPU</span>
+                        </div>
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">45%</span>
+                            <span class="md3-metric-label">Memory</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="md3-diagnostic-card">
+                    <header class="md3-card-header">
+                        <h3 class="md3-card-title">DNS</h3>
+                        <div class="md3-status-chip healthy">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Healthy</span>
+                        </div>
+                    </header>
+                    <div class="md3-chart-container">
+                        <div style="background: var(--chart-primary); height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-primary);">
+                            Chart Area
+                        </div>
+                    </div>
+                    <div class="md3-card-metrics">
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">8ms</span>
+                            <span class="md3-metric-label">Response</span>
+                        </div>
+                        <div class="md3-metric">
+                            <span class="md3-metric-value">85%</span>
+                            <span class="md3-metric-label">Cache Hit</span>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- Details Grid Test -->
+        <section class="test-section">
+            <h2 class="test-title">Details Grid Test</h2>
+            <div class="md3-details-grid">
+                <article class="md3-section-card">
+                    <header>
+                        <h3 class="md3-section-title">Network Performance</h3>
+                    </header>
+                    <div class="md3-chart-container detailed">
+                        <div style="background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary)); height: 100%; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 500;">
+                            Detailed Chart Area
+                        </div>
+                    </div>
+                </article>
+
+                <article class="md3-section-card">
+                    <header>
+                        <h3 class="md3-section-title">Router Controls</h3>
+                    </header>
+                    <div class="control-section">
+                        <h4 class="control-title">System Control</h4>
+                        <div class="safety-message">
+                            <span class="material-symbols-outlined">info</span>
+                            <span>Restarting will temporarily disconnect all devices</span>
+                        </div>
+                        <button class="md3-fab">
+                            <span class="material-symbols-outlined">restart_alt</span>
+                            <span class="fab-label">Restart Router</span>
+                        </button>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- Typography Test -->
+        <section class="test-section">
+            <h2 class="test-title">Typography Scale Test</h2>
+            <div style="display: flex; flex-direction: column; gap: var(--md-sys-spacing-4);">
+                <div class="md3-display-large">Display Large</div>
+                <div class="md3-display-medium">Display Medium</div>
+                <div class="md3-display-small">Display Small</div>
+                <div class="md3-headline-large">Headline Large</div>
+                <div class="md3-headline-medium">Headline Medium</div>
+                <div class="md3-headline-small">Headline Small</div>
+                <div class="md3-title-large">Title Large</div>
+                <div class="md3-title-medium">Title Medium</div>
+                <div class="md3-title-small">Title Small</div>
+                <div class="md3-body-large">Body Large - This is the main body text used throughout the application.</div>
+                <div class="md3-body-medium">Body Medium - This is secondary body text for supporting content.</div>
+                <div class="md3-body-small">Body Small - This is small body text for captions and metadata.</div>
+                <div class="md3-label-large">Label Large</div>
+                <div class="md3-label-medium">Label Medium</div>
+                <div class="md3-label-small">Label Small</div>
+            </div>
+        </section>
+
+        <!-- Spacing Test -->
+        <section class="test-section">
+            <h2 class="test-title">Spacing System Test</h2>
+            <div style="display: flex; flex-direction: column; gap: var(--md-sys-spacing-2);">
+                <div class="spacing-xs" style="background: var(--md-sys-color-primary-container); padding: var(--md-sys-spacing-2); border-radius: 4px;">Spacing XS</div>
+                <div class="spacing-sm" style="background: var(--md-sys-color-secondary-container); padding: var(--md-sys-spacing-2); border-radius: 4px;">Spacing SM</div>
+                <div class="spacing-md" style="background: var(--md-sys-color-tertiary-container); padding: var(--md-sys-spacing-2); border-radius: 4px;">Spacing MD</div>
+                <div class="spacing-lg" style="background: var(--md-sys-color-primary-container); padding: var(--md-sys-spacing-2); border-radius: 4px;">Spacing LG</div>
+                <div class="spacing-xl" style="background: var(--md-sys-color-secondary-container); padding: var(--md-sys-spacing-2); border-radius: 4px;">Spacing XL</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Breakpoint indicator
+        function updateBreakpointIndicator() {
+            const indicator = document.getElementById('current-breakpoint');
+            const width = window.innerWidth;
+            
+            let breakpoint = '';
+            if (width < 600) {
+                breakpoint = 'XS (Mobile)';
+            } else if (width < 900) {
+                breakpoint = 'SM (Large Mobile/Small Tablet)';
+            } else if (width < 1200) {
+                breakpoint = 'MD (Tablet)';
+            } else if (width < 1536) {
+                breakpoint = 'LG (Desktop)';
+            } else {
+                breakpoint = 'XL (Large Desktop)';
+            }
+            
+            indicator.textContent = `${breakpoint} - ${width}px`;
+        }
+        
+        // Update on load and resize
+        updateBreakpointIndicator();
+        window.addEventListener('resize', updateBreakpointIndicator);
+        
+        // Test touch targets
+        document.querySelectorAll('.md3-button, .md3-icon-button, .md3-fab').forEach(button => {
+            const rect = button.getBoundingClientRect();
+            if (rect.width < 48 || rect.height < 48) {
+                button.style.border = '2px solid red';
+                console.warn('Touch target too small:', button, `${rect.width}x${rect.height}`);
+            }
+        });
+    </script>
+</body>
+</html>
