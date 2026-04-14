@@ -1,0 +1,120 @@
+# OpenWrt Build System
+build_dir/
+staging_dir/
+tmp/
+logs/
+.config
+.config.old
+*.orig
+*.rej
+*~
+
+# Compiled binaries and packages
+*.ipk
+*.bin
+*.img
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.ko
+*.mod.c
+.tmp_versions/
+modules.order
+Module.symvers
+
+# OpenWrt specific
+feeds/
+package/feeds/
+scripts/feeds
+dl/
+bin/
+
+# Development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+*.tmp
+/tmp/
+logs/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node.js (if used for build tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Local development
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage/
+.nyc_output/
+.coverage
+htmlcov/
+
+# Documentation build
+docs/_build/
+site/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Local configuration overrides
+config.local
+*.local.conf
+
+# Asset build artifacts (but keep source assets)
+www/notapollo/fonts/google-sans-flex/*.woff2
+www/notapollo/fonts/google-sans-flex/*.woff
+www/notapollo/icons/material-symbols/*.woff2
+www/notapollo/js/lib/chart.min.js.map
+
+# Runtime files
+*.pid
+*.sock
+
+# Security sensitive files
+*.key
+*.pem
+*.crt
+secrets/
+.secrets/
+
+# Local testing and development
+test-results/
+.test-output/

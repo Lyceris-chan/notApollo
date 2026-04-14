@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="notApollo Network Diagnostic Tool for OpenWrt">
+    <title>notApollo - Network Diagnostics</title>
+    
+    <!-- Material 3 Styles -->
+    <link rel="stylesheet" href="css/material3.css">
+    <link rel="stylesheet" href="css/app.css">
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="fonts/google-sans-flex/GoogleSansFlex-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#101418">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
+    <link rel="icon" type="image/png" href="icons/favicon-32x32.png">
+</head>
+<body>
+    <!-- App Shell -->
+    <header class="app-bar">
+        <h1 class="app-title">notApollo</h1>
+        <div class="app-subtitle">Network Diagnostics</div>
+    </header>
+
+    <main class="container">
+        <!-- Diagnostic Cards Grid -->
+        <section class="diagnostic-grid">
+            <!-- System Health Card -->
+            <div class="diagnostic-card" id="system-card">
+                <h2 class="card-title">System Health</h2>
+                <div class="status-indicator" id="system-status">
+                    <span class="status-icon">🟢</span>
+                    <span class="status-text">Healthy</span>
+                </div>
+                <div class="card-content" id="system-details">
+                    <!-- System details will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- WAN/Internet Card -->
+            <div class="diagnostic-card" id="wan-card">
+                <h2 class="card-title">Internet Connection</h2>
+                <div class="status-indicator" id="wan-status">
+                    <span class="status-icon">🟡</span>
+                    <span class="status-text">Checking...</span>
+                </div>
+                <div class="card-content" id="wan-details">
+                    <!-- WAN details will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- WiFi Radio Card -->
+            <div class="diagnostic-card" id="wifi-card">
+                <h2 class="card-title">WiFi Networks</h2>
+                <div class="status-indicator" id="wifi-status">
+                    <span class="status-icon">🟢</span>
+                    <span class="status-text">Active</span>
+                </div>
+                <div class="card-content" id="wifi-details">
+                    <!-- WiFi details will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Router Health Card -->
+            <div class="diagnostic-card" id="router-card">
+                <h2 class="card-title">Router Performance</h2>
+                <div class="status-indicator" id="router-status">
+                    <span class="status-icon">🟢</span>
+                    <span class="status-text">Normal</span>
+                </div>
+                <div class="card-content" id="router-details">
+                    <!-- Router details will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- ONT/Fiber Card -->
+            <div class="diagnostic-card" id="ont-card">
+                <h2 class="card-title">Fiber Connection</h2>
+                <div class="status-indicator" id="ont-status">
+                    <span class="status-icon">🟢</span>
+                    <span class="status-text">Connected</span>
+                </div>
+                <div class="card-content" id="ont-details">
+                    <!-- ONT details will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- DNS Services Card -->
+            <div class="diagnostic-card" id="dns-card">
+                <h2 class="card-title">DNS Services</h2>
+                <div class="status-indicator" id="dns-status">
+                    <span class="status-icon">🟢</span>
+                    <span class="status-text">Working</span>
+                </div>
+                <div class="card-content" id="dns-details">
+                    <!-- DNS details will be populated by JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Router Control Section -->
+        <section class="control-section">
+            <div class="control-card">
+                <h2 class="card-title">Router Control</h2>
+                <div class="control-content">
+                    <button class="restart-button" id="restart-btn">
+                        Restart Router
+                    </button>
+                    <div class="safety-message">
+                        This will restart your router and temporarily disconnect all devices
+                    </div>
+                    <div class="restart-status" id="restart-status" style="display: none;">
+                        <!-- Restart progress will be shown here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h2 class="card-title">ONT Guidance</h2>
+                <div class="ont-guidance" id="ont-guidance">
+                    <!-- ONT guidance content will be populated by JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section class="charts-section">
+            <div class="chart-card">
+                <h2 class="card-title">Network Performance</h2>
+                <div class="chart-container">
+                    <canvas id="latency-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h2 class="card-title">DNS Response Times</h2>
+                <div class="chart-container">
+                    <canvas id="dns-chart"></canvas>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Loading Indicator -->
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading diagnostics...</div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/chart.min.js"></script>
+    <script src="js/diagnostics.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# notApollo configuration file for OpenWrt
+
+config main 'main'
+    option enabled '1'
+    option port '8080'
+    option primary_interface '192.168.69.1'
+    option dad_interface '192.168.70.1'
+    option max_connections '100'
+    option script_timeout '60'
+    option network_timeout '30'
+
+config diagnostics 'diagnostics'
+    option update_interval '30'
+    option dns_test_interval '600'
+    option cache_optimization '1'
+    option nextdns_primary_profile '8753a1'
+    option nextdns_dad_profile '5414da'
+    option monthly_query_limit '300000'
+
+config security 'security'
+    option rate_limit_api '10'
+    option rate_limit_burst '5'
+    option input_validation '1'
+    option audit_logging '1'
+
+config features 'features'
+    option reboot_safety_countdown '5'
+    option ont_guidance '1'
+    option user_friendly_language '1'
+    option dark_theme_default '1'
+    option mobile_optimization '1'
