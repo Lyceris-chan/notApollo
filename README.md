@@ -19,7 +19,40 @@ notApollo provides real-time network diagnostics accessible from both primary (1
 
 ## Quick Start
 
-### Installation
+### Automatic Installation (Recommended)
+
+The easiest way to install notApollo is using our automatic installation script:
+
+```bash
+# Download and run the installation script
+wget -O - https://raw.githubusercontent.com/YOUR_USERNAME/notapollo/main/install-notapollo.sh | sh
+```
+
+This script will:
+- Automatically detect your OpenWrt version and architecture
+- Download the appropriate package from GitHub releases
+- Install and configure notApollo
+- Verify the installation
+
+### Manual Installation
+
+#### Option 1: Pre-built Packages
+
+1. **Download the package:**
+   - Go to [Releases](https://github.com/YOUR_USERNAME/notapollo/releases)
+   - Download the `.ipk` file matching your OpenWrt version and architecture
+
+2. **Install the package:**
+   ```bash
+   # Upload to your router
+   scp notapollo_*.ipk root@192.168.69.1:/tmp/
+   
+   # Install on the router
+   ssh root@192.168.69.1
+   opkg install /tmp/notapollo_*.ipk
+   ```
+
+#### Option 2: Build from Source
 
 1. **Build the OpenWrt package:**
    ```bash
@@ -33,15 +66,44 @@ notApollo provides real-time network diagnostics accessible from both primary (1
    make install
    ```
 
-3. **Access the interface:**
-   - Primary network: http://192.168.69.1:8080
-   - Guest network: http://192.168.70.1:8080
+### Access the Interface
+
+After installation, access notApollo at:
+- **Primary network:** http://192.168.69.1:8080
+- **Guest network:** http://192.168.70.1:8080
+
+### Uninstallation
+
+To completely remove notApollo from your system:
+
+```bash
+# Download and run the uninstallation script
+wget -O - https://raw.githubusercontent.com/YOUR_USERNAME/notapollo/main/uninstall-notapollo.sh | sh
+```
+
+Or manually:
+```bash
+# Stop and remove the service
+/etc/init.d/notapollo stop
+/etc/init.d/notapollo disable
+
+# Remove the package
+opkg remove notapollo
+
+# Clean up remaining files (if any)
+rm -rf /www/notapollo
+rm -f /etc/config/notapollo
+rm -f /etc/uhttpd/notapollo
+
+# Restart web server
+/etc/init.d/uhttpd restart
+```
 
 ### Development Setup
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/yourusername/notapollo.git
    cd notapollo
    ```
 
@@ -56,6 +118,22 @@ notApollo provides real-time network diagnostics accessible from both primary (1
    ```bash
    ./scripts/download-assets.sh
    ```
+
+### Automated Builds
+
+This project uses GitHub Actions to automatically build packages for multiple OpenWrt versions and architectures:
+
+- **Supported OpenWrt versions:** 23.05.4, 24.10.0
+- **Supported architectures:** ramips/mt76x8, x86/64
+- **Automatic releases:** Tagged commits create GitHub releases with pre-built packages
+- **Installation scripts:** Automatic and manual installation scripts are generated
+
+The build process:
+1. Downloads and caches OpenWrt SDKs
+2. Downloads and bundles all external assets (Google Fonts, Chart.js, Material Symbols)
+3. Builds packages for all supported platforms
+4. Creates installation and uninstallation scripts
+5. Publishes releases with all artifacts
 
 ## Architecture
 

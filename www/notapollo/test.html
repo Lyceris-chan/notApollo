@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>notApollo Test Page</title>
+    <style>
+        body {
+            font-family: 'Google Sans Flex', sans-serif;
+            background: #0f1419;
+            color: #e2e2e9;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #1c2024;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #44474f;
+        }
+        .test-result {
+            background: #272a2f;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #a8c7fa;
+            color: #002e69;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: 500;
+            margin: 5px;
+        }
+        button:hover {
+            background: #d3e3fd;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status.success { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+        .status.error { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+        .status.loading { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+    </style>
+</head>
+<body>
+    <h1>notApollo Implementation Test</h1>
+    <p>This page tests the notApollo diagnostic implementation to ensure all components work correctly.</p>
+
+    <div class="test-section">
+        <h2>Material 3 2026 CSS Test</h2>
+        <p>Testing Material 3 design system implementation:</p>
+        <button onclick="testCSS()">Test CSS Variables</button>
+        <div id="css-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>API Endpoints Test</h2>
+        <p>Testing backend API functionality:</p>
+        <button onclick="testAPI('system', 'health')">Test System Health</button>
+        <button onclick="testAPI('diagnostics', 'wan')">Test WAN Diagnostics</button>
+        <button onclick="testAPI('diagnostics', 'wifi')">Test WiFi Status</button>
+        <button onclick="testAPI('dns', 'status')">Test DNS Status</button>
+        <button onclick="testAPI('ont', 'status')">Test ONT Status</button>
+        <div id="api-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>JavaScript Modules Test</h2>
+        <p>Testing JavaScript implementation:</p>
+        <button onclick="testJS()">Test JS Modules</button>
+        <div id="js-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Chart.js Integration Test</h2>
+        <p>Testing chart functionality:</p>
+        <button onclick="testCharts()">Test Charts</button>
+        <div id="chart-result" class="test-result"></div>
+        <canvas id="test-chart" width="400" height="200" style="background: #272a2f; border-radius: 8px; margin-top: 10px;"></canvas>
+    </div>
+
+    <script src="js/lib/chart.min.js"></script>
+    <script>
+        function testCSS() {
+            const result = document.getElementById('css-result');
+            result.innerHTML = '<span class="status loading">Testing...</span>';
+            
+            setTimeout(() => {
+                const computedStyle = getComputedStyle(document.documentElement);
+                const primaryColor = computedStyle.getPropertyValue('--md-sys-color-primary').trim();
+                const surfaceColor = computedStyle.getPropertyValue('--md-sys-color-surface').trim();
+                
+                let output = 'Material 3 2026 CSS Variables:\n';
+                output += `Primary Color: ${primaryColor || 'NOT FOUND'}\n`;
+                output += `Surface Color: ${surfaceColor || 'NOT FOUND'}\n`;
+                output += `Background Color: ${computedStyle.getPropertyValue('--md-sys-color-background').trim()}\n`;
+                output += `Motion Easing: ${computedStyle.getPropertyValue('--md-sys-motion-easing-standard').trim()}\n`;
+                
+                const status = primaryColor && surfaceColor ? 'success' : 'error';
+                result.innerHTML = `<span class="status ${status}">${status.toUpperCase()}</span>\n${output}`;
+            }, 500);
+        }
+
+        async function testAPI(endpoint, action) {
+            const result = document.getElementById('api-result');
+            result.innerHTML = '<span class="status loading">Testing API...</span>';
+            
+            try {
+                const response = await fetch(`/api/${endpoint}.sh?action=${action}`);
+                const data = await response.json();
+                
+                let output = `API Test: ${endpoint}/${action}\n`;
+                output += `Status: ${response.status} ${response.statusText}\n`;
+                output += `Response: ${JSON.stringify(data, null, 2)}`;
+                
+                const status = response.ok ? 'success' : 'error';
+                result.innerHTML = `<span class="status ${status}">${status.toUpperCase()}</span>\n${output}`;
+            } catch (error) {
+                result.innerHTML = `<span class="status error">ERROR</span>\nFailed to test API: ${error.message}`;
+            }
+        }
+
+        function testJS() {
+            const result = document.getElementById('js-result');
+            result.innerHTML = '<span class="status loading">Testing...</span>';
+            
+            setTimeout(() => {
+                let output = 'JavaScript Module Tests:\n';
+                let allPassed = true;
+                
+                // Test if classes are available
+                const tests = [
+                    { name: 'Chart.js', test: () => typeof Chart !== 'undefined' },
+                    { name: 'NotApolloDiagnostics', test: () => typeof NotApolloDiagnostics !== 'undefined' },
+                    { name: 'NotApolloCharts', test: () => typeof NotApolloCharts !== 'undefined' },
+                    { name: 'NotApolloApp', test: () => typeof NotApolloApp !== 'undefined' }
+                ];
+                
+                tests.forEach(test => {
+                    const passed = test.test();
+                    output += `${test.name}: ${passed ? 'PASS' : 'FAIL'}\n`;
+                    if (!passed) allPassed = false;
+                });
+                
+                const status = allPassed ? 'success' : 'error';
+                result.innerHTML = `<span class="status ${status}">${status.toUpperCase()}</span>\n${output}`;
+            }, 500);
+        }
+
+        function testCharts() {
+            const result = document.getElementById('chart-result');
+            const canvas = document.getElementById('test-chart');
+            
+            result.innerHTML = '<span class="status loading">Testing...</span>';
+            
+            try {
+                if (typeof Chart === 'undefined') {
+                    throw new Error('Chart.js not loaded');
+                }
+                
+                // Create a simple test chart
+                const ctx = canvas.getContext('2d');
+                const chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1', '2', '3', '4', '5'],
+                        datasets: [{
+                            label: 'Test Data',
+                            data: [12, 19, 3, 5, 2],
+                            borderColor: '#a8c7fa',
+                            backgroundColor: 'rgba(168, 199, 250, 0.1)',
+                            borderWidth: 2,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: '#44474f'
+                                },
+                                ticks: {
+                                    color: '#c4c6d0'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: '#44474f'
+                                },
+                                ticks: {
+                                    color: '#c4c6d0'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                result.innerHTML = '<span class="status success">SUCCESS</span>\nChart.js integration working correctly!';
+            } catch (error) {
+                result.innerHTML = `<span class="status error">ERROR</span>\nChart test failed: ${error.message}`;
+            }
+        }
+
+        // Auto-run CSS test on load
+        document.addEventListener('DOMContentLoaded', () => {
+            testCSS();
+        });
+    </script>
+</body>
+</html>

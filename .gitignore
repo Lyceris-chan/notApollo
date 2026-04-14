@@ -115,6 +115,12 @@ www/notapollo/js/lib/chart.min.js.map
 secrets/
 .secrets/
 
+# Personal configuration scripts
+monolith.sh
+*monolith*
+config.sh
+setup.sh
+
 # Local testing and development
 test-results/
 .test-output/

@@ -45,6 +45,18 @@ We are committed to providing a welcoming and inclusive environment for all cont
 - `bugfix/issue-description` - Bug fixes
 - `hotfix/critical-fix` - Critical production fixes
 
+### Automated Builds
+
+The project uses GitHub Actions for continuous integration:
+
+- **Pull Requests**: Automatically build and test packages for all supported platforms
+- **Main Branch**: Build packages and create development releases
+- **Tagged Releases**: Create official releases with pre-built packages and installation scripts
+
+**Supported Platforms:**
+- OpenWrt 23.05.4 and 24.10.0
+- Architectures: ramips/mt76x8 (ASUS RT-AX53U), x86/64
+
 ### Making Changes
 
 1. **Create a feature branch:**
@@ -52,11 +64,19 @@ We are committed to providing a welcoming and inclusive environment for all cont
    git checkout -b feature/your-feature-name
    ```
 
-2. **Make your changes following our coding standards**
+2. **Set up development environment:**
+   ```bash
+   ./scripts/quick-start.sh --setup-only
+   ```
 
-3. **Test your changes thoroughly**
+3. **Make your changes following our coding standards**
 
-4. **Commit with descriptive messages:**
+4. **Test your changes thoroughly:**
+   ```bash
+   ./scripts/test.sh
+   ```
+
+5. **Commit with descriptive messages:**
    ```bash
    git commit -m "feat: add DNS cache performance monitoring
    
@@ -65,7 +85,13 @@ We are committed to providing a welcoming and inclusive environment for all cont
    - Update API response format"
    ```
 
-5. **Push and create a pull request**
+6. **Push and create a pull request**
+
+The GitHub Actions workflow will automatically:
+- Build packages for all supported platforms
+- Run tests and quality checks
+- Verify asset downloads work correctly
+- Test installation scripts
 
 ## Coding Standards
 

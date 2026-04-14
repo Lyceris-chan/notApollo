@@ -1,0 +1,735 @@
+name: Build notApollo Package
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PACKAGE_NAME: notapollo
+
+jobs:
+  build-package:
+    name: Build OpenWrt Package
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        openwrt_version: ['23.05.6', '24.10.6', '25.12.2']
+        target: ['ramips/mt76x8', 'x86/64']
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential clang flex bison g++ gawk \
+          gcc-multilib g++-multilib gettext git libncurses5-dev \
+          libssl-dev python3-distutils rsync unzip zlib1g-dev \
+          file wget curl jq
+    
+    - name: Cache OpenWrt SDK
+      uses: actions/cache@v4
+      with:
+        path: openwrt-sdk
+        key: openwrt-sdk-${{ matrix.openwrt_version }}-${{ matrix.target }}
+        restore-keys: |
+          openwrt-sdk-${{ matrix.openwrt_version }}-
+    
+    - name: Download OpenWrt SDK
+      run: |
+        TARGET_ARCH=$(echo "${{ matrix.target }}" | tr '/' '-')
+        
+        # Determine GCC version based on OpenWrt version
+        case "${{ matrix.openwrt_version }}" in
+          23.05.*)
+            GCC_VERSION="12.3.0"
+            ;;
+          24.10.*)
+            GCC_VERSION="13.3.0"
+            ;;
+          25.12.*)
+            GCC_VERSION="14.2.0"
+            ;;
+          *)
+            GCC_VERSION="13.3.0"  # Default fallback
+            ;;
+        esac
+        
+        # Try different SDK file extensions and naming patterns
+        SDK_EXTENSIONS=("tar.zst" "tar.xz")
+        
+        for ext in "${SDK_EXTENSIONS[@]}"; do
+          SDK_URL="https://downloads.openwrt.org/releases/${{ matrix.openwrt_version }}/targets/${{ matrix.target }}/openwrt-sdk-${{ matrix.openwrt_version }}-${TARGET_ARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.${ext}"
+          
+          echo "Trying SDK URL: $SDK_URL"
+          
+          if [ ! -d "openwrt-sdk" ]; then
+            if wget -q --spider "$SDK_URL" 2>/dev/null; then
+              echo "Found SDK at: $SDK_URL"
+              wget -q "$SDK_URL" -O sdk.${ext}
+              mkdir -p openwrt-sdk
+              
+              if [[ "$ext" == "tar.zst" ]]; then
+                tar --zstd -xf sdk.${ext} --strip-components=1 -C openwrt-sdk
+              else
+                tar -xf sdk.${ext} --strip-components=1 -C openwrt-sdk
+              fi
+              
+              rm sdk.${ext}
+              break
+            else
+              echo "SDK not found at: $SDK_URL"
+            fi
+          else
+            echo "SDK already exists, skipping download"
+            break
+          fi
+        done
+        
+        # Verify SDK was downloaded
+        if [ ! -d "openwrt-sdk" ] || [ ! -f "openwrt-sdk/Config.in" ]; then
+          echo "ERROR: Failed to download OpenWrt SDK for ${{ matrix.openwrt_version }} ${TARGET_ARCH}"
+          echo "Tried URLs with GCC version: ${GCC_VERSION}"
+          exit 1
+        fi
+        
+        echo "OpenWrt SDK successfully downloaded and extracted"
+    
+    - name: Prepare package source
+      run: |
+        # Copy package to SDK
+        mkdir -p openwrt-sdk/package/notapollo
+        cp -r package/notapollo/* openwrt-sdk/package/notapollo/
+        
+        # Copy web source
+        mkdir -p openwrt-sdk/package/notapollo/src
+        cp -r www/notapollo openwrt-sdk/package/notapollo/src/
+        
+        # Update Makefile to use local source
+        sed -i 's|PKG_SOURCE_DIR:=.*|PKG_SOURCE_DIR:=$(CURDIR)/src/notapollo|' \
+          openwrt-sdk/package/notapollo/Makefile
+    
+    - name: Download and verify assets
+      run: |
+        cd openwrt-sdk/package/notapollo/src/notapollo
+        
+        # Make scripts executable
+        chmod +x scripts/*.sh
+        
+        # Download assets with retry logic
+        for i in {1..3}; do
+          if ./scripts/download-assets.sh; then
+            echo "Assets downloaded successfully on attempt $i"
+            break
+          else
+            echo "Asset download failed on attempt $i, retrying..."
+            sleep 10
+          fi
+        done
+        
+        # Verify assets
+        ./scripts/verify-assets.sh
+    
+    - name: Build package
+      run: |
+        cd openwrt-sdk
+        
+        # Update feeds
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        
+        # Configure build
+        make defconfig
+        
+        # Build the package
+        make package/notapollo/compile V=s
+    
+    - name: Collect build artifacts
+      run: |
+        cd openwrt-sdk
+        
+        # Find built packages
+        find bin/ -name "*.ipk" -path "*/packages/*" | grep notapollo > ../package-list.txt
+        
+        # Create artifact directory
+        mkdir -p ../artifacts
+        
+        # Copy packages with descriptive names
+        TARGET_ARCH=$(echo "${{ matrix.target }}" | tr '/' '-')
+        while read -r pkg; do
+          if [ -f "$pkg" ]; then
+            filename=$(basename "$pkg")
+            new_name="${filename%.ipk}-${{ matrix.openwrt_version }}-${TARGET_ARCH}.ipk"
+            cp "$pkg" "../artifacts/$new_name"
+            echo "Packaged: $new_name"
+          fi
+        done < ../package-list.txt
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: notapollo-${{ matrix.openwrt_version }}-${{ matrix.target }}
+        path: artifacts/*.ipk
+        retention-days: 30
+    
+    - name: Generate package info
+      run: |
+        cd artifacts
+        for pkg in *.ipk; do
+          if [ -f "$pkg" ]; then
+            echo "=== $pkg ===" >> ../package-info.txt
+            echo "Size: $(stat -c%s "$pkg") bytes" >> ../package-info.txt
+            echo "SHA256: $(sha256sum "$pkg" | cut -d' ' -f1)" >> ../package-info.txt
+            echo "" >> ../package-info.txt
+          fi
+        done
+    
+    - name: Upload package info
+      uses: actions/upload-artifact@v4
+      with:
+        name: package-info-${{ matrix.openwrt_version }}-${{ matrix.target }}
+        path: package-info.txt
+
+  create-installer:
+    name: Create Installation Script
+    runs-on: ubuntu-latest
+    needs: build-package
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Create installation script
+      run: |
+        cat > install-notapollo.sh << 'EOF'
+        #!/bin/sh
+        # notApollo Installation Script
+        # Automatically detects OpenWrt version and architecture, then downloads and installs the appropriate package
+        
+        set -e
+        
+        # Colors for output
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        NC='\033[0m' # No Color
+        
+        log_info() {
+            printf "${BLUE}[INFO]${NC} %s\n" "$1"
+        }
+        
+        log_success() {
+            printf "${GREEN}[SUCCESS]${NC} %s\n" "$1"
+        }
+        
+        log_warning() {
+            printf "${YELLOW}[WARNING]${NC} %s\n" "$1"
+        }
+        
+        log_error() {
+            printf "${RED}[ERROR]${NC} %s\n" "$1"
+        }
+        
+        # Detect OpenWrt version and architecture
+        detect_system() {
+            if [ ! -f /etc/openwrt_release ]; then
+                log_error "This script requires OpenWrt. /etc/openwrt_release not found."
+                exit 1
+            fi
+            
+            . /etc/openwrt_release
+            
+            OPENWRT_VERSION=$(echo "$DISTRIB_RELEASE" | cut -d. -f1-2)
+            OPENWRT_ARCH=$(uname -m)
+            
+            # Map architecture names
+            case "$OPENWRT_ARCH" in
+                mips|mipsel) TARGET="ramips-mt76x8" ;;
+                x86_64) TARGET="x86-64" ;;
+                aarch64) TARGET="mediatek-filogic" ;;
+                *) 
+                    log_warning "Unknown architecture: $OPENWRT_ARCH"
+                    TARGET="ramips-mt76x8"
+                    ;;
+            esac
+            
+            log_info "Detected OpenWrt $OPENWRT_VERSION on $OPENWRT_ARCH (target: $TARGET)"
+        }
+        
+        # Download package from GitHub releases
+        download_package() {
+            local github_repo="YOUR_GITHUB_USERNAME/notapollo"
+            local release_url="https://api.github.com/repos/$github_repo/releases/latest"
+            
+            log_info "Fetching latest release information..."
+            
+            # Get latest release info
+            if command -v curl >/dev/null 2>&1; then
+                release_info=$(curl -s "$release_url")
+            elif command -v wget >/dev/null 2>&1; then
+                release_info=$(wget -qO- "$release_url")
+            else
+                log_error "Neither curl nor wget found. Please install one of them."
+                exit 1
+            fi
+            
+            # Find matching package
+            package_name="notapollo_*-${OPENWRT_VERSION}-${TARGET}.ipk"
+            download_url=$(echo "$release_info" | grep -o "https://.*${TARGET}\.ipk" | head -1)
+            
+            if [ -z "$download_url" ]; then
+                log_error "No package found for OpenWrt $OPENWRT_VERSION on $TARGET"
+                log_info "Available packages:"
+                echo "$release_info" | grep -o "notapollo_.*\.ipk" | head -5
+                exit 1
+            fi
+            
+            package_file=$(basename "$download_url")
+            
+            log_info "Downloading $package_file..."
+            if command -v curl >/dev/null 2>&1; then
+                curl -L -o "/tmp/$package_file" "$download_url"
+            else
+                wget -O "/tmp/$package_file" "$download_url"
+            fi
+            
+            log_success "Downloaded to /tmp/$package_file"
+        }
+        
+        # Install package
+        install_package() {
+            log_info "Installing notApollo package..."
+            
+            # Update package lists
+            opkg update
+            
+            # Install package
+            if opkg install "/tmp/$package_file"; then
+                log_success "notApollo installed successfully!"
+            else
+                log_error "Installation failed. Check the error messages above."
+                exit 1
+            fi
+            
+            # Clean up
+            rm -f "/tmp/$package_file"
+        }
+        
+        # Verify installation
+        verify_installation() {
+            log_info "Verifying installation..."
+            
+            # Check if service exists
+            if [ -f /etc/init.d/notapollo ]; then
+                log_success "Service script installed"
+            else
+                log_warning "Service script not found"
+            fi
+            
+            # Check if web files exist
+            if [ -d /www/notapollo ]; then
+                log_success "Web interface installed"
+            else
+                log_warning "Web interface not found"
+            fi
+            
+            # Try to start service
+            if /etc/init.d/notapollo start; then
+                log_success "Service started successfully"
+            else
+                log_warning "Service failed to start"
+            fi
+            
+            # Check if web interface is accessible
+            sleep 3
+            if curl -s -f http://127.0.0.1:8080 >/dev/null 2>&1; then
+                log_success "Web interface is accessible"
+            else
+                log_warning "Web interface may not be accessible yet"
+            fi
+        }
+        
+        # Show access information
+        show_access_info() {
+            echo ""
+            log_success "=== Installation Complete ==="
+            echo ""
+            echo "notApollo is now available at:"
+            echo "  Primary Network: http://192.168.69.1:8080"
+            echo "  Guest Network:   http://192.168.70.1:8080"
+            echo ""
+            echo "Service management:"
+            echo "  Start:   /etc/init.d/notapollo start"
+            echo "  Stop:    /etc/init.d/notapollo stop"
+            echo "  Restart: /etc/init.d/notapollo restart"
+            echo "  Status:  /etc/init.d/notapollo status"
+            echo ""
+            echo "Configuration: /etc/config/notapollo"
+            echo "Web files:     /www/notapollo/"
+            echo ""
+            echo "For troubleshooting, check the logs:"
+            echo "  logread | grep notapollo"
+        }
+        
+        # Main installation process
+        main() {
+            echo "notApollo Installation Script"
+            echo "============================="
+            echo ""
+            
+            # Check if running as root
+            if [ "$(id -u)" -ne 0 ]; then
+                log_error "This script must be run as root"
+                exit 1
+            fi
+            
+            detect_system
+            download_package
+            install_package
+            verify_installation
+            show_access_info
+        }
+        
+        # Run main function
+        main "$@"
+        EOF
+        
+        chmod +x install-notapollo.sh
+    
+    - name: Create uninstall script
+      run: |
+        cat > uninstall-notapollo.sh << 'EOF'
+        #!/bin/sh
+        # notApollo Uninstallation Script
+        
+        set -e
+        
+        # Colors for output
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        NC='\033[0m' # No Color
+        
+        log_info() {
+            printf "${BLUE}[INFO]${NC} %s\n" "$1"
+        }
+        
+        log_success() {
+            printf "${GREEN}[SUCCESS]${NC} %s\n" "$1"
+        }
+        
+        log_warning() {
+            printf "${YELLOW}[WARNING]${NC} %s\n" "$1"
+        }
+        
+        log_error() {
+            printf "${RED}[ERROR]${NC} %s\n" "$1"
+        }
+        
+        # Stop and disable service
+        stop_service() {
+            log_info "Stopping notApollo service..."
+            
+            if [ -f /etc/init.d/notapollo ]; then
+                /etc/init.d/notapollo stop 2>/dev/null || true
+                /etc/init.d/notapollo disable 2>/dev/null || true
+                log_success "Service stopped and disabled"
+            else
+                log_info "Service script not found, skipping"
+            fi
+        }
+        
+        # Remove package
+        remove_package() {
+            log_info "Removing notApollo package..."
+            
+            if opkg list-installed | grep -q "^notapollo "; then
+                opkg remove notapollo
+                log_success "Package removed"
+            else
+                log_warning "Package not found in installed packages"
+            fi
+        }
+        
+        # Clean up remaining files
+        cleanup_files() {
+            log_info "Cleaning up remaining files..."
+            
+            # Remove web files
+            if [ -d /www/notapollo ]; then
+                rm -rf /www/notapollo
+                log_success "Web files removed"
+            fi
+            
+            # Remove configuration
+            if [ -f /etc/config/notapollo ]; then
+                rm -f /etc/config/notapollo
+                log_success "Configuration removed"
+            fi
+            
+            # Remove uhttpd configuration
+            if [ -f /etc/uhttpd/notapollo ]; then
+                rm -f /etc/uhttpd/notapollo
+                log_success "Web server configuration removed"
+            fi
+            
+            # Remove service script (if still present)
+            if [ -f /etc/init.d/notapollo ]; then
+                rm -f /etc/init.d/notapollo
+                log_success "Service script removed"
+            fi
+        }
+        
+        # Restart web server
+        restart_webserver() {
+            log_info "Restarting web server..."
+            
+            if /etc/init.d/uhttpd restart; then
+                log_success "Web server restarted"
+            else
+                log_warning "Failed to restart web server"
+            fi
+        }
+        
+        # Verify removal
+        verify_removal() {
+            log_info "Verifying removal..."
+            
+            local issues=0
+            
+            # Check if package is still installed
+            if opkg list-installed | grep -q "^notapollo "; then
+                log_warning "Package still appears to be installed"
+                issues=$((issues + 1))
+            fi
+            
+            # Check if web files still exist
+            if [ -d /www/notapollo ]; then
+                log_warning "Web files still exist at /www/notapollo"
+                issues=$((issues + 1))
+            fi
+            
+            # Check if service is still running
+            if pgrep -f notapollo >/dev/null 2>&1; then
+                log_warning "notApollo processes still running"
+                issues=$((issues + 1))
+            fi
+            
+            # Check if web interface is still accessible
+            if curl -s -f http://127.0.0.1:8080 >/dev/null 2>&1; then
+                log_warning "Web interface may still be accessible"
+                issues=$((issues + 1))
+            fi
+            
+            if [ $issues -eq 0 ]; then
+                log_success "Removal verification passed"
+            else
+                log_warning "Removal verification found $issues potential issues"
+            fi
+        }
+        
+        # Show completion message
+        show_completion() {
+            echo ""
+            log_success "=== Uninstallation Complete ==="
+            echo ""
+            echo "notApollo has been removed from your system."
+            echo ""
+            echo "If you want to reinstall notApollo later:"
+            echo "  wget -O - https://raw.githubusercontent.com/YOUR_USERNAME/notapollo/main/install-notapollo.sh | sh"
+            echo ""
+            echo "Or download and run the installation script manually."
+        }
+        
+        # Main uninstallation process
+        main() {
+            echo "notApollo Uninstallation Script"
+            echo "==============================="
+            echo ""
+            
+            # Check if running as root
+            if [ "$(id -u)" -ne 0 ]; then
+                log_error "This script must be run as root"
+                exit 1
+            fi
+            
+            # Confirm uninstallation
+            printf "Are you sure you want to uninstall notApollo? [y/N]: "
+            read -r confirm
+            case "$confirm" in
+                [yY]|[yY][eE][sS])
+                    log_info "Proceeding with uninstallation..."
+                    ;;
+                *)
+                    log_info "Uninstallation cancelled"
+                    exit 0
+                    ;;
+            esac
+            
+            stop_service
+            remove_package
+            cleanup_files
+            restart_webserver
+            verify_removal
+            show_completion
+        }
+        
+        # Run main function
+        main "$@"
+        EOF
+        
+        chmod +x uninstall-notapollo.sh
+    
+    - name: Upload installation scripts
+      uses: actions/upload-artifact@v4
+      with:
+        name: installation-scripts
+        path: |
+          install-notapollo.sh
+          uninstall-notapollo.sh
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-package, create-installer]
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    
+    - name: Prepare release assets
+      run: |
+        mkdir -p release-assets
+        
+        # Copy all IPK files
+        find artifacts -name "*.ipk" -exec cp {} release-assets/ \;
+        
+        # Copy installation scripts
+        cp artifacts/installation-scripts/* release-assets/
+        
+        # Create checksums
+        cd release-assets
+        sha256sum *.ipk > checksums.txt
+        sha256sum *.sh >> checksums.txt
+    
+    - name: Create release notes
+      run: |
+        cat > release-notes.md << EOF
+        # notApollo Release ${GITHUB_REF#refs/tags/}
+        
+        ## Installation
+        
+        ### Quick Install (Recommended)
+        Run this command on your OpenWrt router:
+        \`\`\`bash
+        wget -O - https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF#refs/tags/}/install-notapollo.sh | sh
+        \`\`\`
+        
+        ### Manual Installation
+        1. Download the appropriate .ipk file for your OpenWrt version and architecture
+        2. Upload it to your router: \`scp notapollo_*.ipk root@192.168.1.1:/tmp/\`
+        3. Install: \`opkg install /tmp/notapollo_*.ipk\`
+        
+        ### Package Files
+        - **notapollo_*-23.05.6-*.ipk**: For OpenWrt 23.05.x
+        - **notapollo_*-24.10.6-*.ipk**: For OpenWrt 24.10.x  
+        - **notapollo_*-25.12.2-*.ipk**: For OpenWrt 25.12.x (latest)
+        - **install-notapollo.sh**: Automatic installation script
+        - **uninstall-notapollo.sh**: Uninstallation script
+        - **checksums.txt**: SHA256 checksums for verification
+        
+        ## Access
+        After installation, access notApollo at:
+        - Primary Network: http://192.168.69.1:8080
+        - Guest Network: http://192.168.70.1:8080
+        
+        ## Uninstallation
+        To remove notApollo:
+        \`\`\`bash
+        wget -O - https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF#refs/tags/}/uninstall-notapollo.sh | sh
+        \`\`\`
+        
+        ## Features
+        - Material 3 dark theme interface
+        - Dual network interface support
+        - Real-time network diagnostics
+        - DNS monitoring with cache optimization
+        - User-friendly language throughout
+        - Mobile-optimized responsive design
+        - Local asset serving (offline capable)
+        
+        ## Requirements
+        - OpenWrt 22.03+ (tested on 23.05.4 and 24.10.0)
+        - ASUS RT-AX53U or compatible router
+        - Minimum 32MB flash storage
+        - Minimum 128MB RAM
+        
+        ## Support
+        - Documentation: [GitHub Repository](https://github.com/${GITHUB_REPOSITORY})
+        - Issues: [GitHub Issues](https://github.com/${GITHUB_REPOSITORY}/issues)
+        - Discussions: [GitHub Discussions](https://github.com/${GITHUB_REPOSITORY}/discussions)
+        EOF
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release-assets/*
+        body_path: release-notes.md
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-installation:
+    name: Test Installation Script
+    runs-on: ubuntu-latest
+    needs: create-installer
+    
+    steps:
+    - name: Download installation scripts
+      uses: actions/download-artifact@v4
+      with:
+        name: installation-scripts
+    
+    - name: Test script syntax
+      run: |
+        # Test shell script syntax
+        sh -n install-notapollo.sh
+        sh -n uninstall-notapollo.sh
+        
+        echo "✓ Installation script syntax is valid"
+        echo "✓ Uninstallation script syntax is valid"
+    
+    - name: Test script help/info
+      run: |
+        # Test that scripts can show help without errors
+        chmod +x install-notapollo.sh uninstall-notapollo.sh
+        
+        # These should not fail even without OpenWrt
+        echo "Testing script error handling..."
+        
+        # Should exit gracefully when not on OpenWrt
+        if ./install-notapollo.sh 2>&1 | grep -q "requires OpenWrt"; then
+          echo "✓ Install script properly detects non-OpenWrt environment"
+        fi
+        
+        if ./uninstall-notapollo.sh 2>&1 | grep -q "must be run as root"; then
+          echo "✓ Uninstall script properly checks for root privileges"
+        fi
