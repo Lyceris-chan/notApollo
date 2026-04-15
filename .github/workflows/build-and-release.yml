@@ -19,8 +19,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        openwrt_version: ['23.05.6', '24.10.6', '25.12.2']
+        openwrt_version: ['23.05.6', '24.10.6']
         target: ['ramips/mt76x8', 'x86/64']
+        exclude:
+          # ramips/mt76x8 doesn't have SDK files, only x86/64 does
+          - openwrt_version: '23.05.6'
+            target: 'ramips/mt76x8'
+          - openwrt_version: '24.10.6'
+            target: 'ramips/mt76x8'
     
     steps:
     - name: Checkout repository
@@ -745,8 +751,7 @@ jobs:
         
         ### Package Files
         - **notapollo_*-23.05.6-*.ipk**: For OpenWrt 23.05.x
-        - **notapollo_*-24.10.6-*.ipk**: For OpenWrt 24.10.x  
-        - **notapollo_*-25.12.2-*.ipk**: For OpenWrt 25.12.x (latest)
+        - **notapollo_*-24.10.6-*.ipk**: For OpenWrt 24.10.x (latest stable)
         - **install-notapollo.sh**: Automatic installation script
         - **uninstall-notapollo.sh**: Uninstallation script
         - **checksums.txt**: SHA256 checksums for verification
@@ -772,7 +777,7 @@ jobs:
         - Local asset serving (offline capable)
         
         ## Requirements
-        - OpenWrt 23.05+ (tested on 23.05.6, 24.10.6, and 25.12.2)
+        - OpenWrt 23.05+ (tested on 23.05.6 and 24.10.6)
         - Compatible router with sufficient resources
         - Minimum 32MB flash storage
         - Minimum 128MB RAM

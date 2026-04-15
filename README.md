@@ -128,7 +128,7 @@ rm -f /etc/uhttpd/notapollo
 
 This project uses GitHub Actions to automatically build packages for multiple OpenWrt versions and architectures:
 
-- **Supported OpenWrt versions:** 23.05.6, 24.10.6, 25.12.2 (latest)
+- **Supported OpenWrt versions:** 23.05.6, 24.10.6 (latest stable)
 - **Supported architectures:** ramips/mt76x8, x86/64
 - **Automatic releases:** Tagged commits create GitHub releases with pre-built packages
 - **Installation scripts:** Automatic and manual installation scripts are generated
