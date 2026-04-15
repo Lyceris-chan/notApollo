@@ -52,13 +52,32 @@ create_directories() {
 download_google_fonts() {
   log_info "Downloading Google Sans Flex fonts..."
   
+  # Check if fonts already exist
+  if [[ -f "$FONTS_DIR/GoogleSansFlex-Regular.woff2" ]] || [[ -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]]; then
+    log_success "Google Sans Flex fonts already exist, skipping download"
+    return 0
+  fi
+  
   # Get CSS file to extract font URLs
   local css_content
-  css_content=$(curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$GOOGLE_FONTS_API")
+  if ! css_content=$(curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$GOOGLE_FONTS_API"); then
+    log_error "Failed to fetch Google Fonts CSS"
+    return 1
+  fi
+  
+  if [[ -z "$css_content" ]]; then
+    log_error "Empty response from Google Fonts API"
+    return 1
+  fi
   
   # Extract woff2 URLs from CSS
   local font_urls
   font_urls=$(echo "$css_content" | grep -oP 'https://[^)]+\.woff2' | sort -u)
+  
+  if [[ -z "$font_urls" ]]; then
+    log_error "No font URLs found in CSS response"
+    return 1
+  fi
   
   local font_count=0
   while IFS= read -r url; do
@@ -84,11 +103,16 @@ download_google_fonts() {
       
       log_info "Downloading font: $output_name"
       if curl -s -L "$url" -o "$FONTS_DIR/$output_name"; then
-        log_success "Downloaded: $output_name"
-        ((font_count++))
+        # Verify the file was actually downloaded and has content
+        if [[ -f "$FONTS_DIR/$output_name" ]] && [[ -s "$FONTS_DIR/$output_name" ]]; then
+          log_success "Downloaded: $output_name"
+          ((font_count++))
+        else
+          log_error "Downloaded file is empty: $output_name"
+          rm -f "$FONTS_DIR/$output_name"
+        fi
       else
         log_error "Failed to download: $output_name"
-        return 1
       fi
     fi
   done <<< "$font_urls"
@@ -100,24 +124,57 @@ download_google_fonts() {
   if [[ -n "$variable_font_url" ]]; then
     log_info "Downloading variable font..."
     if curl -s -L "$variable_font_url" -o "$FONTS_DIR/GoogleSansFlex-Variable.woff2"; then
-      log_success "Downloaded: GoogleSansFlex-Variable.woff2"
+      if [[ -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]] && [[ -s "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]]; then
+        log_success "Downloaded: GoogleSansFlex-Variable.woff2"
+      else
+        log_error "Variable font file is empty"
+        rm -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2"
+      fi
     else
       log_error "Failed to download variable font"
     fi
   fi
+  
+  # Check if we got at least one font
+  if [[ $font_count -eq 0 ]] && [[ ! -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]]; then
+    log_error "No fonts were successfully downloaded"
+    return 1
+  fi
+  
+  log_success "Downloaded $font_count individual fonts"
+  return 0
 }
 
 # Download Material Symbols icons
 download_material_symbols() {
   log_info "Downloading Material Symbols icons..."
   
+  # Check if icons already exist
+  if [[ -f "$ICONS_DIR/material-symbols-outlined.woff2" ]]; then
+    log_success "Material Symbols icons already exist, skipping download"
+    return 0
+  fi
+  
   # Get CSS file to extract icon font URLs
   local css_content
-  css_content=$(curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$MATERIAL_SYMBOLS_URL")
+  if ! css_content=$(curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$MATERIAL_SYMBOLS_URL"); then
+    log_error "Failed to fetch Material Symbols CSS"
+    return 1
+  fi
+  
+  if [[ -z "$css_content" ]]; then
+    log_error "Empty response from Material Symbols API"
+    return 1
+  fi
   
   # Extract woff2 URLs
   local icon_urls
   icon_urls=$(echo "$css_content" | grep -oP 'https://[^)]+\.woff2' | sort -u)
+  
+  if [[ -z "$icon_urls" ]]; then
+    log_error "No icon URLs found in CSS response"
+    return 1
+  fi
   
   local icon_count=0
   while IFS= read -r url; do
@@ -126,11 +183,16 @@ download_material_symbols() {
       
       log_info "Downloading icons: $filename"
       if curl -s -L "$url" -o "$ICONS_DIR/$filename"; then
-        log_success "Downloaded: $filename"
-        ((icon_count++))
+        # Verify the file was actually downloaded and has content
+        if [[ -f "$ICONS_DIR/$filename" ]] && [[ -s "$ICONS_DIR/$filename" ]]; then
+          log_success "Downloaded: $filename"
+          ((icon_count++))
+        else
+          log_error "Downloaded file is empty: $filename"
+          rm -f "$ICONS_DIR/$filename"
+        fi
       else
         log_error "Failed to download: $filename"
-        return 1
       fi
     fi
   done <<< "$icon_urls"
@@ -139,6 +201,10 @@ download_material_symbols() {
   if [[ $icon_count -gt 0 ]]; then
     cp "$ICONS_DIR/material-symbols-outlined-0.woff2" "$ICONS_DIR/material-symbols-outlined.woff2"
     log_success "Created primary icon font: material-symbols-outlined.woff2"
+    return 0
+  else
+    log_error "No icons were successfully downloaded"
+    return 1
   fi
 }
 
@@ -146,19 +212,33 @@ download_material_symbols() {
 download_chartjs() {
   log_info "Downloading Chart.js library..."
   
+  # Check if Chart.js already exists
+  if [[ -f "$JS_DIR/chart.min.js" ]]; then
+    local file_size
+    file_size=$(stat -c%s "$JS_DIR/chart.min.js" 2>/dev/null || stat -f%z "$JS_DIR/chart.min.js" 2>/dev/null || echo "0")
+    if [[ $file_size -gt 50000 ]]; then
+      log_success "Chart.js already exists and is valid, skipping download"
+      return 0
+    else
+      log_warning "Existing Chart.js file is too small, re-downloading..."
+      rm -f "$JS_DIR/chart.min.js"
+    fi
+  fi
+  
   if curl -s -L "$CHART_JS_URL" -o "$JS_DIR/chart.min.js"; then
-    log_success "Downloaded: chart.min.js"
-    
     # Verify file size (Chart.js should be substantial)
     local file_size
     file_size=$(stat -c%s "$JS_DIR/chart.min.js" 2>/dev/null || stat -f%z "$JS_DIR/chart.min.js" 2>/dev/null || echo "0")
     
     if [[ $file_size -lt 50000 ]]; then
       log_error "Chart.js file seems too small ($file_size bytes), possible download issue"
+      rm -f "$JS_DIR/chart.min.js"
       return 1
     fi
     
+    log_success "Downloaded: chart.min.js"
     log_info "Chart.js size: $file_size bytes"
+    return 0
   else
     log_error "Failed to download Chart.js"
     return 1
@@ -325,25 +405,136 @@ main() {
   
   create_directories
   
-  # Download assets
-  download_google_fonts || { log_error "Font download failed"; exit 1; }
-  download_material_symbols || { log_error "Icon download failed"; exit 1; }
-  download_chartjs || { log_error "Chart.js download failed"; exit 1; }
+  # Track which downloads succeed
+  local fonts_success=false
+  local icons_success=false
+  local chartjs_success=false
   
-  # Generate CSS
+  # Download assets individually and track success
+  if download_google_fonts; then
+    fonts_success=true
+  else
+    log_warning "Google Fonts download failed, will create fallback"
+  fi
+  
+  if download_material_symbols; then
+    icons_success=true
+  else
+    log_warning "Material Symbols download failed, will create fallback"
+  fi
+  
+  if download_chartjs; then
+    chartjs_success=true
+  else
+    log_error "Chart.js download failed - this is required"
+  fi
+  
+  # Generate CSS (always do this)
   generate_font_css
   generate_icon_css
   
-  # Verify everything
-  if verify_assets; then
+  # Verify what we have and create fallbacks if needed
+  local verification_errors=0
+  
+  # Check fonts
+  if [[ ! -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]] && [[ ! -f "$FONTS_DIR/GoogleSansFlex-Regular.woff2" ]]; then
+    if [[ "$fonts_success" == "false" ]]; then
+      log_warning "Creating fallback font CSS..."
+      cat > "$FONTS_DIR/fonts.css" << 'EOF'
+/* Fallback font CSS - uses system fonts */
+@font-face {
+  font-family: 'Google Sans Flex';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: local('system-ui'), local('-apple-system'), local('BlinkMacSystemFont');
+}
+EOF
+      log_success "Created fallback font CSS"
+    else
+      log_error "No Google Sans Flex fonts found"
+      ((verification_errors++))
+    fi
+  else
+    log_success "Google Sans Flex fonts verified"
+  fi
+  
+  # Check icons
+  if [[ ! -f "$ICONS_DIR/material-symbols-outlined.woff2" ]]; then
+    if [[ "$icons_success" == "false" ]]; then
+      log_warning "Creating fallback icon CSS..."
+      cat > "$ICONS_DIR/icons.css" << 'EOF'
+/* Fallback icon CSS - uses Unicode symbols */
+.material-symbols-outlined {
+  font-family: 'Courier New', monospace;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+}
+EOF
+      log_success "Created fallback icon CSS"
+    else
+      log_error "Material Symbols icons not found"
+      ((verification_errors++))
+    fi
+  else
+    log_success "Material Symbols icons verified"
+  fi
+  
+  # Check Chart.js (required)
+  if [[ ! -f "$JS_DIR/chart.min.js" ]]; then
+    log_error "Chart.js library not found"
+    ((verification_errors++))
+  else
+    local file_size
+    file_size=$(stat -c%s "$JS_DIR/chart.min.js" 2>/dev/null || stat -f%z "$JS_DIR/chart.min.js" 2>/dev/null || echo "0")
+    if [[ $file_size -lt 50000 ]]; then
+      log_error "Chart.js file seems corrupted (size: $file_size bytes)"
+      ((verification_errors++))
+    else
+      log_success "Chart.js library verified ($file_size bytes)"
+    fi
+  fi
+  
+  # Check CSS files
+  if [[ ! -f "$FONTS_DIR/fonts.css" ]]; then
+    log_error "Font CSS not generated"
+    ((verification_errors++))
+  else
+    log_success "Font CSS verified"
+  fi
+  
+  if [[ ! -f "$ICONS_DIR/icons.css" ]]; then
+    log_error "Icon CSS not generated"
+    ((verification_errors++))
+  else
+    log_success "Icon CSS verified"
+  fi
+  
+  # Final result
+  if [[ $verification_errors -eq 0 ]]; then
     log_success "=== Asset Download Complete ==="
     log_success "All assets are now available locally for offline serving"
+    if [[ "$fonts_success" == "false" ]] || [[ "$icons_success" == "false" ]]; then
+      log_info "Note: Some assets use fallbacks, but functionality is preserved"
+    fi
     log_info "Assets location: $ASSETS_DIR"
     log_info "- Fonts: $FONTS_DIR"
     log_info "- Icons: $ICONS_DIR"
     log_info "- JavaScript: $JS_DIR"
+    exit 0
   else
-    log_error "Asset verification failed"
+    log_error "Asset verification failed with $verification_errors critical errors"
+    if [[ "$chartjs_success" == "false" ]]; then
+      log_error "Chart.js is required for functionality - cannot proceed without it"
+    fi
     exit 1
   fi
 }

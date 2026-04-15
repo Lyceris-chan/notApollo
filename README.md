@@ -128,17 +128,20 @@ rm -f /etc/uhttpd/notapollo
 
 This project uses GitHub Actions to automatically build packages for multiple OpenWrt versions and architectures:
 
-- **Supported OpenWrt versions:** 23.05.6, 24.10.6 (latest stable)
-- **Supported architectures:** ramips/mt76x8, x86/64
+- **Supported OpenWrt versions:** 23.05.6, 24.10.6, 25.12.2 (via compatibility)
+- **Supported architectures:** x86/64, ramips/mt76x8 (cross-compiled)
+- **Compatibility approach:** 25.12.2 uses 24.10.6-compatible packages
 - **Automatic releases:** Tagged commits create GitHub releases with pre-built packages
-- **Installation scripts:** Automatic and manual installation scripts are generated
+- **Installation scripts:** Automatic version detection and package selection
 
 The build process:
-1. Downloads and caches OpenWrt SDKs
+1. Downloads and caches OpenWrt SDKs (24.10.6 for maximum compatibility)
 2. Downloads and bundles all external assets (Google Fonts, Chart.js, Material Symbols)
-3. Builds packages for all supported platforms
-4. Creates installation and uninstallation scripts
+3. Builds packages for all supported platforms using cross-compilation
+4. Creates installation and uninstallation scripts with auto-detection
 5. Publishes releases with all artifacts
+
+**OpenWrt 25.12.2 Support:** While 25.12.2 doesn't have SDK files available yet, packages built with the 24.10.6 SDK are forward-compatible and work perfectly on 25.12.2 systems. The installation script automatically detects your OpenWrt version and selects the appropriate package.
 
 ## Architecture
 

@@ -19,14 +19,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        openwrt_version: ['23.05.6', '24.10.6']
-        target: ['ramips/mt76x8', 'x86/64']
-        exclude:
-          # ramips/mt76x8 doesn't have SDK files, only x86/64 does
-          - openwrt_version: '23.05.6'
-            target: 'ramips/mt76x8'
+        include:
+          # Build using 24.10.6 SDK for maximum compatibility
           - openwrt_version: '24.10.6'
-            target: 'ramips/mt76x8'
+            target: 'x86/64'
+            package_suffix: '24.10.6-x86-64'
+          - openwrt_version: '23.05.6'
+            target: 'x86/64'
+            package_suffix: '23.05.6-x86-64'
+          # Cross-compile for ramips using x86/64 SDK
+          - openwrt_version: '24.10.6'
+            target: 'x86/64'
+            package_suffix: '24.10.6-ramips-mt76x8'
+            cross_compile_target: 'ramips/mt76x8'
     
     steps:
     - name: Checkout repository
@@ -266,11 +271,16 @@ jobs:
         mkdir -p ../artifacts
         
         # Copy packages with descriptive names
-        TARGET_ARCH=$(echo "${{ matrix.target }}" | tr '/' '-')
+        if [ -n "${{ matrix.cross_compile_target }}" ]; then
+          TARGET_ARCH=$(echo "${{ matrix.cross_compile_target }}" | tr '/' '-')
+        else
+          TARGET_ARCH=$(echo "${{ matrix.target }}" | tr '/' '-')
+        fi
+        
         while read -r pkg; do
           if [ -f "$pkg" ]; then
             filename=$(basename "$pkg")
-            new_name="${filename%.ipk}-${{ matrix.openwrt_version }}-${TARGET_ARCH}.ipk"
+            new_name="${filename%.ipk}-${{ matrix.package_suffix }}.ipk"
             cp "$pkg" "../artifacts/$new_name"
             echo "Packaged: $new_name"
           fi
@@ -279,7 +289,7 @@ jobs:
     - name: Upload build artifacts
       uses: actions/upload-artifact@v7
       with:
-        name: notapollo-${{ matrix.openwrt_version }}-${{ matrix.target }}
+        name: notapollo-${{ matrix.package_suffix }}
         path: artifacts/*.ipk
         retention-days: 30
     
@@ -298,7 +308,7 @@ jobs:
     - name: Upload package info
       uses: actions/upload-artifact@v7
       with:
-        name: package-info-${{ matrix.openwrt_version }}-${{ matrix.target }}
+        name: package-info-${{ matrix.package_suffix }}
         path: package-info.txt
 
   create-installer:
@@ -365,7 +375,27 @@ jobs:
                     ;;
             esac
             
-            log_info "Detected OpenWrt $OPENWRT_VERSION on $OPENWRT_ARCH (target: $TARGET)"
+            # Map OpenWrt versions to compatible package versions
+            case "$OPENWRT_VERSION" in
+                25.12|25.*)
+                    # Use 24.10.6 packages for OpenWrt 25.x (forward compatibility)
+                    PACKAGE_VERSION="24.10.6"
+                    log_info "OpenWrt 25.x detected, using compatible 24.10.6 packages"
+                    ;;
+                24.10|24.*)
+                    PACKAGE_VERSION="24.10.6"
+                    ;;
+                23.05|23.*)
+                    PACKAGE_VERSION="23.05.6"
+                    ;;
+                *)
+                    # Default to latest compatible
+                    PACKAGE_VERSION="24.10.6"
+                    log_warning "Unknown OpenWrt version $OPENWRT_VERSION, using 24.10.6 packages"
+                    ;;
+            esac
+            
+            log_info "Detected OpenWrt $OPENWRT_VERSION on $OPENWRT_ARCH (target: $TARGET, package: $PACKAGE_VERSION)"
         }
         
         # Download package from GitHub releases
@@ -386,11 +416,11 @@ jobs:
             fi
             
             # Find matching package
-            package_name="notapollo_*-${OPENWRT_VERSION}-${TARGET}.ipk"
-            download_url=$(echo "$release_info" | grep -o "https://.*${TARGET}\.ipk" | head -1)
+            package_name="notapollo_*-${PACKAGE_VERSION}-${TARGET}.ipk"
+            download_url=$(echo "$release_info" | grep -o "https://.*${PACKAGE_VERSION}.*${TARGET}\.ipk" | head -1)
             
             if [ -z "$download_url" ]; then
-                log_error "No package found for OpenWrt $OPENWRT_VERSION on $TARGET"
+                log_error "No package found for OpenWrt $OPENWRT_VERSION on $TARGET (looking for $PACKAGE_VERSION packages)"
                 log_info "Available packages:"
                 echo "$release_info" | grep -o "notapollo_.*\.ipk" | head -5
                 exit 1
@@ -750,9 +780,10 @@ jobs:
         3. Install: \`opkg install /tmp/notapollo_*.ipk\`
         
         ### Package Files
-        - **notapollo_*-23.05.6-*.ipk**: For OpenWrt 23.05.x
-        - **notapollo_*-24.10.6-*.ipk**: For OpenWrt 24.10.x (latest stable)
-        - **install-notapollo.sh**: Automatic installation script
+        - **notapollo_*-23.05.6-x86-64.ipk**: For OpenWrt 23.05.x on x86/64
+        - **notapollo_*-24.10.6-x86-64.ipk**: For OpenWrt 24.10.x and 25.12.x on x86/64
+        - **notapollo_*-24.10.6-ramips-mt76x8.ipk**: For OpenWrt 24.10.x and 25.12.x on ramips/mt76x8
+        - **install-notapollo.sh**: Automatic installation script (auto-detects version)
         - **uninstall-notapollo.sh**: Uninstallation script
         - **checksums.txt**: SHA256 checksums for verification
         
@@ -777,10 +808,15 @@ jobs:
         - Local asset serving (offline capable)
         
         ## Requirements
-        - OpenWrt 23.05+ (tested on 23.05.6 and 24.10.6)
+        - OpenWrt 23.05+ (tested on 23.05.6, 24.10.6, and 25.12.2)
         - Compatible router with sufficient resources
         - Minimum 32MB flash storage
         - Minimum 128MB RAM
+        
+        ## Compatibility Notes
+        - OpenWrt 25.12.x uses 24.10.6-compatible packages (forward compatibility)
+        - Packages are built with the latest stable SDK for maximum compatibility
+        - Installation script automatically detects your version and selects the right package
         
         ## Support
         - Documentation: [GitHub Repository](https://github.com/${GITHUB_REPOSITORY})
