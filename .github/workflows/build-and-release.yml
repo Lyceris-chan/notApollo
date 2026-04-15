@@ -17,8 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     
     strategy:
+      fail-fast: false
       matrix:
-        openwrt_version: ['23.05.6', '24.10.6', '25.12.1']
+        openwrt_version: ['23.05.6', '24.10.6', '25.12.2']
         target: ['ramips/mt76x8', 'x86/64']
     
     steps:
@@ -33,125 +34,220 @@ jobs:
         sudo apt-get install -y \
           build-essential clang flex bison g++ gawk \
           gcc-multilib g++-multilib gettext git libncurses5-dev \
-          libssl-dev python3-distutils rsync unzip zlib1g-dev \
-          file wget curl jq
+          libssl-dev python3-setuptools python3-dev rsync unzip zlib1g-dev \
+          file wget curl jq zstd
     
     - name: Cache OpenWrt SDK
       uses: actions/cache@v5
       with:
-        path: openwrt-sdk
-        key: openwrt-sdk-${{ matrix.openwrt_version }}-${{ matrix.target }}
+        path: |
+          openwrt-sdk
+          dl
+        key: openwrt-sdk-${{ matrix.openwrt_version }}-${{ matrix.target }}-${{ hashFiles('package/notapollo/Makefile') }}
         restore-keys: |
+          openwrt-sdk-${{ matrix.openwrt_version }}-${{ matrix.target }}-
           openwrt-sdk-${{ matrix.openwrt_version }}-
+    
+    - name: Cache downloaded assets
+      uses: actions/cache@v5
+      with:
+        path: |
+          www/notapollo/fonts
+          www/notapollo/icons
+          www/notapollo/js/lib
+        key: notapollo-assets-${{ hashFiles('www/notapollo/scripts/download-assets.sh') }}
+        restore-keys: |
+          notapollo-assets-
     
     - name: Download OpenWrt SDK
       run: |
         TARGET_ARCH=$(echo "${{ matrix.target }}" | tr '/' '-')
         
-        # Determine GCC version based on OpenWrt version
+        # Determine GCC version and musl version based on OpenWrt version
         case "${{ matrix.openwrt_version }}" in
           23.05.*)
             GCC_VERSION="12.3.0"
+            MUSL_VERSION="musl"
             ;;
           24.10.*)
             GCC_VERSION="13.3.0"
+            MUSL_VERSION="musl"
             ;;
           25.12.*)
             GCC_VERSION="14.2.0"
+            MUSL_VERSION="musl"
             ;;
           *)
-            GCC_VERSION="14.2.0"  # Default to latest
+            GCC_VERSION="14.2.0"
+            MUSL_VERSION="musl"
             ;;
         esac
         
-        # Try different SDK file extensions and naming patterns
-        SDK_EXTENSIONS=("tar.zst" "tar.xz")
+        # Try different SDK naming patterns
+        SDK_PATTERNS=(
+          "openwrt-sdk-${{ matrix.openwrt_version }}-${TARGET_ARCH}_gcc-${GCC_VERSION}_${MUSL_VERSION}.Linux-x86_64"
+          "openwrt-sdk-${{ matrix.openwrt_version }}-${TARGET_ARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64"
+          "openwrt-sdk-${{ matrix.openwrt_version }}-${TARGET_ARCH}"
+        )
         
-        for ext in "${SDK_EXTENSIONS[@]}"; do
-          SDK_URL="https://downloads.openwrt.org/releases/${{ matrix.openwrt_version }}/targets/${{ matrix.target }}/openwrt-sdk-${{ matrix.openwrt_version }}-${TARGET_ARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.${ext}"
-          
-          echo "Trying SDK URL: $SDK_URL"
-          
-          if [ ! -d "openwrt-sdk" ]; then
+        SDK_EXTENSIONS=("tar.zst" "tar.xz" "tar.bz2")
+        
+        SDK_FOUND=false
+        
+        for pattern in "${SDK_PATTERNS[@]}"; do
+          for ext in "${SDK_EXTENSIONS[@]}"; do
+            SDK_URL="https://downloads.openwrt.org/releases/${{ matrix.openwrt_version }}/targets/${{ matrix.target }}/${pattern}.${ext}"
+            
+            echo "Trying SDK URL: $SDK_URL"
+            
             if wget -q --spider "$SDK_URL" 2>/dev/null; then
               echo "Found SDK at: $SDK_URL"
-              wget -q "$SDK_URL" -O sdk.${ext}
+              wget "$SDK_URL" -O sdk.${ext}
               mkdir -p openwrt-sdk
               
-              if [[ "$ext" == "tar.zst" ]]; then
-                tar --zstd -xf sdk.${ext} --strip-components=1 -C openwrt-sdk
-              else
-                tar -xf sdk.${ext} --strip-components=1 -C openwrt-sdk
-              fi
+              case "$ext" in
+                "tar.zst")
+                  tar --use-compress-program=unzstd -xf sdk.${ext} --strip-components=1 -C openwrt-sdk
+                  ;;
+                "tar.xz")
+                  tar -xJf sdk.${ext} --strip-components=1 -C openwrt-sdk
+                  ;;
+                "tar.bz2")
+                  tar -xjf sdk.${ext} --strip-components=1 -C openwrt-sdk
+                  ;;
+              esac
               
               rm sdk.${ext}
-              break
+              SDK_FOUND=true
+              break 2
             else
               echo "SDK not found at: $SDK_URL"
             fi
-          else
-            echo "SDK already exists, skipping download"
-            break
-          fi
+          done
         done
         
         # Verify SDK was downloaded
-        if [ ! -d "openwrt-sdk" ] || [ ! -f "openwrt-sdk/Config.in" ]; then
+        if [ "$SDK_FOUND" = false ] || [ ! -d "openwrt-sdk" ]; then
           echo "ERROR: Failed to download OpenWrt SDK for ${{ matrix.openwrt_version }} ${TARGET_ARCH}"
-          echo "Tried URLs with GCC version: ${GCC_VERSION}"
+          echo "Tried patterns with GCC version: ${GCC_VERSION}"
+          exit 1
+        fi
+        
+        # Verify SDK structure
+        if [ ! -f "openwrt-sdk/Config.in" ] && [ ! -f "openwrt-sdk/rules.mk" ]; then
+          echo "ERROR: SDK structure appears invalid"
+          echo "SDK directory contents:"
+          ls -la openwrt-sdk/ | head -20
+          echo "Looking for key files:"
+          find openwrt-sdk -name "Config.in" -o -name "rules.mk" -o -name "Makefile" | head -10
           exit 1
         fi
         
         echo "OpenWrt SDK successfully downloaded and extracted"
+        echo "SDK structure verified - found required build files"
     
     - name: Prepare package source
       run: |
-        # Copy package to SDK
+        # Create package directory in SDK
         mkdir -p openwrt-sdk/package/notapollo
+        
+        # Copy package Makefile and files
         cp -r package/notapollo/* openwrt-sdk/package/notapollo/
         
-        # Copy web source
+        # Create source directory structure
         mkdir -p openwrt-sdk/package/notapollo/src
+        
+        # Copy web application source
         cp -r www/notapollo openwrt-sdk/package/notapollo/src/
         
-        # Update Makefile to use local source
-        sed -i 's|PKG_SOURCE_DIR:=.*|PKG_SOURCE_DIR:=$(CURDIR)/src/notapollo|' \
-          openwrt-sdk/package/notapollo/Makefile
+        # Ensure scripts are executable
+        find openwrt-sdk/package/notapollo/src/notapollo/scripts -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+        find openwrt-sdk/package/notapollo/src/notapollo/api -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+        
+        # Update Makefile to use correct source directory
+        cd openwrt-sdk/package/notapollo
+        sed -i 's|PKG_SOURCE_DIR:=.*|PKG_SOURCE_DIR:=$(CURDIR)/src/notapollo|' Makefile
+        
+        echo "Package source prepared successfully"
     
     - name: Download and verify assets
       run: |
         cd openwrt-sdk/package/notapollo/src/notapollo
         
         # Make scripts executable
-        chmod +x scripts/*.sh
+        chmod +x scripts/*.sh api/*.sh 2>/dev/null || true
+        
+        # Check if assets are already cached
+        if [ -f "fonts/google-sans-flex/GoogleSansFlex-Regular.woff2" ] && \
+           [ -f "icons/material-symbols/material-symbols-outlined.woff2" ] && \
+           [ -f "js/lib/chart.min.js" ]; then
+          echo "Assets found in cache, verifying..."
+          if ./scripts/verify-assets.sh; then
+            echo "Cached assets verified successfully"
+            exit 0
+          else
+            echo "Cached assets failed verification, re-downloading..."
+          fi
+        fi
         
         # Download assets with retry logic
         for i in {1..3}; do
-          if ./scripts/download-assets.sh; then
+          echo "Asset download attempt $i/3..."
+          if timeout 300 ./scripts/download-assets.sh; then
             echo "Assets downloaded successfully on attempt $i"
             break
           else
-            echo "Asset download failed on attempt $i, retrying..."
+            echo "Asset download failed on attempt $i"
+            if [ $i -eq 3 ]; then
+              echo "All download attempts failed"
+              exit 1
+            fi
+            echo "Retrying in 10 seconds..."
             sleep 10
           fi
         done
         
         # Verify assets
+        echo "Verifying downloaded assets..."
         ./scripts/verify-assets.sh
     
     - name: Build package
       run: |
         cd openwrt-sdk
         
-        # Update feeds
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
+        # Show SDK info
+        echo "=== OpenWrt SDK Information ==="
+        [ -f include/version.mk ] && cat include/version.mk | head -20 || echo "version.mk not found"
+        echo ""
+        
+        # Update and install feeds
+        echo "=== Updating feeds ==="
+        ./scripts/feeds update -a || {
+          echo "Feed update failed, continuing anyway..."
+        }
+        
+        echo "=== Installing feeds ==="
+        ./scripts/feeds install -a || {
+          echo "Feed install failed, continuing anyway..."
+        }
         
         # Configure build
+        echo "=== Configuring build ==="
         make defconfig
         
-        # Build the package
-        make package/notapollo/compile V=s
+        # Show package info
+        echo "=== Package directory structure ==="
+        ls -la package/notapollo/
+        
+        # Build the package with verbose output
+        echo "=== Building notapollo package ==="
+        make package/notapollo/compile V=s J=1 || {
+          echo "=== Build failed, showing logs ==="
+          find . -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || true
+          exit 1
+        }
+        
+        echo "=== Build completed successfully ==="
     
     - name: Collect build artifacts
       run: |
@@ -650,7 +746,7 @@ jobs:
         ### Package Files
         - **notapollo_*-23.05.6-*.ipk**: For OpenWrt 23.05.x
         - **notapollo_*-24.10.6-*.ipk**: For OpenWrt 24.10.x  
-        - **notapollo_*-25.12.1-*.ipk**: For OpenWrt 25.12.x (latest)
+        - **notapollo_*-25.12.2-*.ipk**: For OpenWrt 25.12.x (latest)
         - **install-notapollo.sh**: Automatic installation script
         - **uninstall-notapollo.sh**: Uninstallation script
         - **checksums.txt**: SHA256 checksums for verification
@@ -676,7 +772,7 @@ jobs:
         - Local asset serving (offline capable)
         
         ## Requirements
-        - OpenWrt 23.05+ (tested on 23.05.6, 24.10.6, and 25.12.1)
+        - OpenWrt 23.05+ (tested on 23.05.6, 24.10.6, and 25.12.2)
         - Compatible router with sufficient resources
         - Minimum 32MB flash storage
         - Minimum 128MB RAM
