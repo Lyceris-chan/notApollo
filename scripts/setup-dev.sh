@@ -209,7 +209,11 @@ setup_web_dev() {
     fi
     
     # Download assets if script exists
-    if [ -f scripts/download-assets.sh ]; then
+    if [ -f scripts/smart-retry-assets.sh ]; then
+        print_status "Downloading web assets with smart retry..."
+        chmod +x scripts/smart-retry-assets.sh
+        ./scripts/smart-retry-assets.sh
+    elif [ -f scripts/download-assets.sh ]; then
         print_status "Downloading web assets..."
         ./scripts/download-assets.sh
     else

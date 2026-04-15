@@ -33,6 +33,10 @@ log_success() {
   echo "[SUCCESS] $*" >&2
 }
 
+log_warning() {
+  echo "[WARNING] $*" >&2
+}
+
 # Error handling
 cleanup() {
   if [[ -d "$TEMP_DIR" ]]; then
@@ -58,80 +62,139 @@ download_google_fonts() {
     return 0
   fi
   
-  # Get CSS file to extract font URLs
-  local css_content
-  if ! css_content=$(curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$GOOGLE_FONTS_API"); then
-    log_error "Failed to fetch Google Fonts CSS"
-    return 1
-  fi
+  # Try multiple approaches to get Google Fonts
+  local css_content=""
+  local attempts=0
+  local max_attempts=3
+  
+  while [[ $attempts -lt $max_attempts ]] && [[ -z "$css_content" ]]; do
+    ((attempts++))
+    log_info "Attempting to fetch Google Fonts CSS (attempt $attempts/$max_attempts)..."
+    
+    # Try different user agents and approaches
+    case $attempts in
+      1)
+        # Standard browser user agent
+        css_content=$(curl -s -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "$GOOGLE_FONTS_API" || true)
+        ;;
+      2)
+        # Different browser user agent
+        css_content=$(curl -s -L -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "$GOOGLE_FONTS_API" || true)
+        ;;
+      3)
+        # Try alternative Google Fonts API endpoint
+        local alt_url="https://fonts.googleapis.com/css?family=Google+Sans:300,400,500,600,700&display=swap"
+        css_content=$(curl -s -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$alt_url" || true)
+        ;;
+    esac
+    
+    # Check if we got valid CSS content
+    if [[ -n "$css_content" ]] && [[ "$css_content" =~ @font-face|woff2|src: ]]; then
+      log_success "Successfully fetched Google Fonts CSS on attempt $attempts"
+      break
+    else
+      log_warning "Attempt $attempts failed or returned invalid CSS"
+      css_content=""
+      if [[ $attempts -lt $max_attempts ]]; then
+        sleep 2
+      fi
+    fi
+  done
   
   if [[ -z "$css_content" ]]; then
-    log_error "Empty response from Google Fonts API"
+    log_error "Failed to fetch Google Fonts CSS after $max_attempts attempts"
     return 1
   fi
   
-  # Extract woff2 URLs from CSS
-  local font_urls
-  font_urls=$(echo "$css_content" | grep -oP 'https://[^)]+\.woff2' | sort -u)
+  # Extract woff2 URLs from CSS - try multiple patterns
+  local font_urls=""
+  
+  # Pattern 1: Standard woff2 URLs
+  font_urls=$(echo "$css_content" | grep -oP 'https://[^)]+\.woff2' | sort -u || true)
+  
+  # Pattern 2: If no URLs found, try different extraction
+  if [[ -z "$font_urls" ]]; then
+    font_urls=$(echo "$css_content" | sed -n 's/.*src:\s*url(\([^)]*\.woff2[^)]*\)).*/\1/p' | sed 's/["\x27]//g' | sort -u || true)
+  fi
+  
+  # Pattern 3: Extract from src: url() format
+  if [[ -z "$font_urls" ]]; then
+    font_urls=$(echo "$css_content" | grep -o 'url([^)]*\.woff2[^)]*)' | sed 's/url(//g; s/)//g; s/["\x27]//g' | sort -u || true)
+  fi
   
   if [[ -z "$font_urls" ]]; then
     log_error "No font URLs found in CSS response"
+    log_info "CSS content preview: $(echo "$css_content" | head -c 200)..."
     return 1
   fi
   
   local font_count=0
   while IFS= read -r url; do
-    if [[ -n "$url" ]]; then
+    if [[ -n "$url" ]] && [[ "$url" =~ ^https?:// ]]; then
       local filename
       filename=$(basename "$url" | sed 's/[^a-zA-Z0-9.-]/_/g')
       
       # Determine weight from URL for better naming
       local weight_name=""
-      if [[ "$url" =~ wght@300 ]]; then
+      if [[ "$url" =~ wght@300 ]] || [[ "$url" =~ :300 ]]; then
         weight_name="Light"
-      elif [[ "$url" =~ wght@400 ]]; then
+      elif [[ "$url" =~ wght@400 ]] || [[ "$url" =~ :400 ]] || [[ "$url" =~ regular ]]; then
         weight_name="Regular"
-      elif [[ "$url" =~ wght@500 ]]; then
+      elif [[ "$url" =~ wght@500 ]] || [[ "$url" =~ :500 ]]; then
         weight_name="Medium"
-      elif [[ "$url" =~ wght@600 ]]; then
+      elif [[ "$url" =~ wght@600 ]] || [[ "$url" =~ :600 ]]; then
         weight_name="SemiBold"
-      elif [[ "$url" =~ wght@700 ]]; then
+      elif [[ "$url" =~ wght@700 ]] || [[ "$url" =~ :700 ]] || [[ "$url" =~ bold ]]; then
         weight_name="Bold"
       fi
       
       local output_name="GoogleSansFlex-${weight_name:-${font_count}}.woff2"
       
-      log_info "Downloading font: $output_name"
+      log_info "Downloading font: $output_name from $url"
       if curl -s -L "$url" -o "$FONTS_DIR/$output_name"; then
         # Verify the file was actually downloaded and has content
         if [[ -f "$FONTS_DIR/$output_name" ]] && [[ -s "$FONTS_DIR/$output_name" ]]; then
-          log_success "Downloaded: $output_name"
-          ((font_count++))
+          local file_size
+          file_size=$(stat -c%s "$FONTS_DIR/$output_name" 2>/dev/null || stat -f%z "$FONTS_DIR/$output_name" 2>/dev/null || echo "0")
+          if [[ $file_size -gt 1000 ]]; then
+            log_success "Downloaded: $output_name ($file_size bytes)"
+            ((font_count++))
+          else
+            log_warning "Downloaded file is too small: $output_name ($file_size bytes)"
+            rm -f "$FONTS_DIR/$output_name"
+          fi
         else
-          log_error "Downloaded file is empty: $output_name"
+          log_warning "Downloaded file is empty: $output_name"
           rm -f "$FONTS_DIR/$output_name"
         fi
       else
-        log_error "Failed to download: $output_name"
+        log_warning "Failed to download: $output_name"
       fi
     fi
   done <<< "$font_urls"
   
-  # Create a variable font file if available
+  # Try to create a variable font file if available
   local variable_font_url
-  variable_font_url=$(echo "$css_content" | grep -oP 'https://[^)]+wght@300\.\.700[^)]+\.woff2' | head -1)
+  variable_font_url=$(echo "$css_content" | grep -oP 'https://[^)]+wght@300\.\.700[^)]+\.woff2' | head -1 || true)
   
   if [[ -n "$variable_font_url" ]]; then
     log_info "Downloading variable font..."
     if curl -s -L "$variable_font_url" -o "$FONTS_DIR/GoogleSansFlex-Variable.woff2"; then
       if [[ -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]] && [[ -s "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]]; then
-        log_success "Downloaded: GoogleSansFlex-Variable.woff2"
+        local file_size
+        file_size=$(stat -c%s "$FONTS_DIR/GoogleSansFlex-Variable.woff2" 2>/dev/null || stat -f%z "$FONTS_DIR/GoogleSansFlex-Variable.woff2" 2>/dev/null || echo "0")
+        if [[ $file_size -gt 1000 ]]; then
+          log_success "Downloaded: GoogleSansFlex-Variable.woff2 ($file_size bytes)"
+        else
+          log_warning "Variable font file is too small ($file_size bytes)"
+          rm -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2"
+        fi
       else
-        log_error "Variable font file is empty"
+        log_warning "Variable font file is empty"
         rm -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2"
       fi
     else
-      log_error "Failed to download variable font"
+      log_warning "Failed to download variable font"
     fi
   fi
   
@@ -155,44 +218,96 @@ download_material_symbols() {
     return 0
   fi
   
-  # Get CSS file to extract icon font URLs
-  local css_content
-  if ! css_content=$(curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$MATERIAL_SYMBOLS_URL"); then
-    log_error "Failed to fetch Material Symbols CSS"
-    return 1
-  fi
+  # Try multiple approaches to get Material Symbols
+  local css_content=""
+  local attempts=0
+  local max_attempts=3
+  
+  while [[ $attempts -lt $max_attempts ]] && [[ -z "$css_content" ]]; do
+    ((attempts++))
+    log_info "Attempting to fetch Material Symbols CSS (attempt $attempts/$max_attempts)..."
+    
+    # Try different user agents and approaches
+    case $attempts in
+      1)
+        # Standard browser user agent
+        css_content=$(curl -s -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "$MATERIAL_SYMBOLS_URL" || true)
+        ;;
+      2)
+        # Different browser user agent
+        css_content=$(curl -s -L -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "$MATERIAL_SYMBOLS_URL" || true)
+        ;;
+      3)
+        # Try alternative Material Icons endpoint
+        local alt_url="https://fonts.googleapis.com/icon?family=Material+Icons"
+        css_content=$(curl -s -L -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "$alt_url" || true)
+        ;;
+    esac
+    
+    # Check if we got valid CSS content
+    if [[ -n "$css_content" ]] && [[ "$css_content" =~ @font-face|woff2|src: ]]; then
+      log_success "Successfully fetched Material Symbols CSS on attempt $attempts"
+      break
+    else
+      log_warning "Attempt $attempts failed or returned invalid CSS"
+      css_content=""
+      if [[ $attempts -lt $max_attempts ]]; then
+        sleep 2
+      fi
+    fi
+  done
   
   if [[ -z "$css_content" ]]; then
-    log_error "Empty response from Material Symbols API"
+    log_error "Failed to fetch Material Symbols CSS after $max_attempts attempts"
     return 1
   fi
   
-  # Extract woff2 URLs
-  local icon_urls
-  icon_urls=$(echo "$css_content" | grep -oP 'https://[^)]+\.woff2' | sort -u)
+  # Extract woff2 URLs - try multiple patterns
+  local icon_urls=""
+  
+  # Pattern 1: Standard woff2 URLs
+  icon_urls=$(echo "$css_content" | grep -oP 'https://[^)]+\.woff2' | sort -u || true)
+  
+  # Pattern 2: If no URLs found, try different extraction
+  if [[ -z "$icon_urls" ]]; then
+    icon_urls=$(echo "$css_content" | sed -n 's/.*src:\s*url(\([^)]*\.woff2[^)]*\)).*/\1/p' | sed 's/["\x27]//g' | sort -u || true)
+  fi
+  
+  # Pattern 3: Extract from src: url() format
+  if [[ -z "$icon_urls" ]]; then
+    icon_urls=$(echo "$css_content" | grep -o 'url([^)]*\.woff2[^)]*)' | sed 's/url(//g; s/)//g; s/["\x27]//g' | sort -u || true)
+  fi
   
   if [[ -z "$icon_urls" ]]; then
     log_error "No icon URLs found in CSS response"
+    log_info "CSS content preview: $(echo "$css_content" | head -c 200)..."
     return 1
   fi
   
   local icon_count=0
   while IFS= read -r url; do
-    if [[ -n "$url" ]]; then
+    if [[ -n "$url" ]] && [[ "$url" =~ ^https?:// ]]; then
       local filename="material-symbols-outlined-${icon_count}.woff2"
       
-      log_info "Downloading icons: $filename"
+      log_info "Downloading icons: $filename from $url"
       if curl -s -L "$url" -o "$ICONS_DIR/$filename"; then
         # Verify the file was actually downloaded and has content
         if [[ -f "$ICONS_DIR/$filename" ]] && [[ -s "$ICONS_DIR/$filename" ]]; then
-          log_success "Downloaded: $filename"
-          ((icon_count++))
+          local file_size
+          file_size=$(stat -c%s "$ICONS_DIR/$filename" 2>/dev/null || stat -f%z "$ICONS_DIR/$filename" 2>/dev/null || echo "0")
+          if [[ $file_size -gt 1000 ]]; then
+            log_success "Downloaded: $filename ($file_size bytes)"
+            ((icon_count++))
+          else
+            log_warning "Downloaded file is too small: $filename ($file_size bytes)"
+            rm -f "$ICONS_DIR/$filename"
+          fi
         else
-          log_error "Downloaded file is empty: $filename"
+          log_warning "Downloaded file is empty: $filename"
           rm -f "$ICONS_DIR/$filename"
         fi
       else
-        log_error "Failed to download: $filename"
+        log_warning "Failed to download: $filename"
       fi
     fi
   done <<< "$icon_urls"
@@ -249,57 +364,77 @@ download_chartjs() {
 generate_font_css() {
   log_info "Generating local font CSS..."
   
+  # Check what font files we actually have
+  local font_files=()
+  local variable_font=""
+  
+  # Look for variable font first
+  if [[ -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]]; then
+    variable_font="GoogleSansFlex-Variable.woff2"
+  fi
+  
+  # Collect all numbered font files
+  while IFS= read -r -d '' file; do
+    font_files+=("$(basename "$file")")
+  done < <(find "$FONTS_DIR" -name "GoogleSansFlex-*.woff2" -type f -print0 2>/dev/null | sort -z)
+  
+  # Generate CSS based on available files
   cat > "$FONTS_DIR/fonts.css" << 'EOF'
 /* Google Sans Flex - Local Font Definitions */
 /* Generated automatically by download-assets.sh */
 
+EOF
+  
+  # Add variable font if available
+  if [[ -n "$variable_font" ]]; then
+    cat >> "$FONTS_DIR/fonts.css" << EOF
 @font-face {
   font-family: 'Google Sans Flex';
   font-style: normal;
   font-weight: 300 700;
   font-display: swap;
-  src: url('./GoogleSansFlex-Variable.woff2') format('woff2-variations');
+  src: url('./$variable_font') format('woff2-variations');
 }
 
-/* Fallback individual weights */
+EOF
+  fi
+  
+  # Add individual font files as fallbacks
+  local weight_counter=300
+  for font_file in "${font_files[@]}"; do
+    if [[ "$font_file" != "$variable_font" ]]; then
+      cat >> "$FONTS_DIR/fonts.css" << EOF
 @font-face {
   font-family: 'Google Sans Flex';
   font-style: normal;
-  font-weight: 300;
+  font-weight: $weight_counter;
   font-display: swap;
-  src: url('./GoogleSansFlex-Light.woff2') format('woff2');
+  src: url('./$font_file') format('woff2');
 }
 
+EOF
+      # Increment weight for next font (300, 400, 500, 600, 700, etc.)
+      case $weight_counter in
+        300) weight_counter=400 ;;
+        400) weight_counter=500 ;;
+        500) weight_counter=600 ;;
+        600) weight_counter=700 ;;
+        700) weight_counter=800 ;;
+        800) weight_counter=900 ;;
+        *) ((weight_counter += 100)) ;;
+      esac
+    fi
+  done
+  
+  # Add fallback for system fonts
+  cat >> "$FONTS_DIR/fonts.css" << 'EOF'
+/* System font fallback */
 @font-face {
-  font-family: 'Google Sans Flex';
+  font-family: 'Google Sans Flex Fallback';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 300 700;
   font-display: swap;
-  src: url('./GoogleSansFlex-Regular.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Google Sans Flex';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('./GoogleSansFlex-Medium.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Google Sans Flex';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('./GoogleSansFlex-SemiBold.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Google Sans Flex';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('./GoogleSansFlex-Bold.woff2') format('woff2');
+  src: local('system-ui'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), local('sans-serif');
 }
 EOF
   
@@ -351,8 +486,15 @@ verify_assets() {
   
   # Check fonts
   if [[ ! -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]] && [[ ! -f "$FONTS_DIR/GoogleSansFlex-Regular.woff2" ]]; then
-    log_error "No Google Sans Flex fonts found"
-    ((errors++))
+    # Check if we have any Google Sans Flex fonts (numbered files)
+    local font_files
+    font_files=$(find "$FONTS_DIR" -name "GoogleSansFlex-*.woff2" -type f 2>/dev/null | wc -l)
+    if [[ $font_files -eq 0 ]]; then
+      log_error "No Google Sans Flex fonts found"
+      ((errors++))
+    else
+      log_success "Google Sans Flex fonts verified ($font_files files)"
+    fi
   else
     log_success "Google Sans Flex fonts verified"
   fi
@@ -438,9 +580,13 @@ main() {
   
   # Check fonts
   if [[ ! -f "$FONTS_DIR/GoogleSansFlex-Variable.woff2" ]] && [[ ! -f "$FONTS_DIR/GoogleSansFlex-Regular.woff2" ]]; then
-    if [[ "$fonts_success" == "false" ]]; then
-      log_warning "Creating fallback font CSS..."
-      cat > "$FONTS_DIR/fonts.css" << 'EOF'
+    # Check if we have any Google Sans Flex fonts (numbered files)
+    local font_files
+    font_files=$(find "$FONTS_DIR" -name "GoogleSansFlex-*.woff2" -type f 2>/dev/null | wc -l)
+    if [[ $font_files -eq 0 ]]; then
+      if [[ "$fonts_success" == "false" ]]; then
+        log_warning "Creating fallback font CSS..."
+        cat > "$FONTS_DIR/fonts.css" << 'EOF'
 /* Fallback font CSS - uses system fonts */
 @font-face {
   font-family: 'Google Sans Flex';
@@ -450,10 +596,13 @@ main() {
   src: local('system-ui'), local('-apple-system'), local('BlinkMacSystemFont');
 }
 EOF
-      log_success "Created fallback font CSS"
+        log_success "Created fallback font CSS"
+      else
+        log_error "No Google Sans Flex fonts found"
+        ((verification_errors++))
+      fi
     else
-      log_error "No Google Sans Flex fonts found"
-      ((verification_errors++))
+      log_success "Google Sans Flex fonts verified ($font_files files)"
     fi
   else
     log_success "Google Sans Flex fonts verified"

@@ -127,19 +127,29 @@ clean_build_dirs() {
 download_assets() {
   log_info "Downloading external assets..."
   
-  if [[ ! -f "$SCRIPT_DIR/download-assets.sh" ]]; then
-    log_error "Asset download script not found: $SCRIPT_DIR/download-assets.sh"
-    return 1
-  fi
-  
-  # Make script executable
-  chmod +x "$SCRIPT_DIR/download-assets.sh"
-  
-  # Run asset download
-  if "$SCRIPT_DIR/download-assets.sh"; then
-    log_success "Asset download completed"
+  # Check if smart retry script exists, use it if available
+  if [[ -f "$SCRIPT_DIR/smart-retry-assets.sh" ]]; then
+    log_info "Using smart retry asset download..."
+    chmod +x "$SCRIPT_DIR/smart-retry-assets.sh"
+    
+    if "$SCRIPT_DIR/smart-retry-assets.sh"; then
+      log_success "Smart asset download completed"
+    else
+      log_error "Smart asset download failed"
+      return 1
+    fi
+  elif [[ -f "$SCRIPT_DIR/download-assets.sh" ]]; then
+    log_info "Using standard asset download..."
+    chmod +x "$SCRIPT_DIR/download-assets.sh"
+    
+    if "$SCRIPT_DIR/download-assets.sh"; then
+      log_success "Asset download completed"
+    else
+      log_error "Asset download failed"
+      return 1
+    fi
   else
-    log_error "Asset download failed"
+    log_error "No asset download script found"
     return 1
   fi
 }

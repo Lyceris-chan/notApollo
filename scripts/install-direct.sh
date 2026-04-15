@@ -139,21 +139,33 @@ download_assets() {
     
     log_info "Missing assets: ${missing_assets[*]}"
     
-    # Try to download missing assets
-    for attempt in {1..3}; do
-        log_info "Asset download attempt $attempt/3..."
-        
-        if timeout 300 ./scripts/download-assets.sh; then
-            log_success "Assets downloaded successfully on attempt $attempt"
+    # Try to download missing assets with smart retry
+    if [ -f "./scripts/smart-retry-assets.sh" ]; then
+        log_info "Using smart retry asset download..."
+        chmod +x ./scripts/smart-retry-assets.sh
+        if timeout 600 ./scripts/smart-retry-assets.sh; then
+            log_success "Smart asset download completed successfully"
             return 0
         else
-            log_warning "Asset download failed on attempt $attempt"
-            if [ $attempt -lt 3 ]; then
-                log_info "Retrying in 10 seconds..."
-                sleep 10
-            fi
+            log_warning "Smart asset download failed"
         fi
-    done
+    else
+        log_info "Using standard asset download with retry..."
+        for attempt in {1..3}; do
+            log_info "Asset download attempt $attempt/3..."
+            
+            if timeout 300 ./scripts/download-assets.sh; then
+                log_success "Assets downloaded successfully on attempt $attempt"
+                return 0
+            else
+                log_warning "Asset download failed on attempt $attempt"
+                if [ $attempt -lt 3 ]; then
+                    log_info "Retrying in 10 seconds..."
+                    sleep 10
+                fi
+            fi
+        done
+    fi
     
     # If download failed, check if we can proceed with existing assets
     log_warning "Asset download failed after 3 attempts"

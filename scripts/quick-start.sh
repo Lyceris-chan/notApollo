@@ -82,10 +82,15 @@ download_assets() {
     
     cd www/notapollo
     
-    if [ -f "scripts/download-assets.sh" ]; then
+    if [ -f "scripts/smart-retry-assets.sh" ]; then
+        log_info "Using smart retry asset download..."
+        chmod +x scripts/smart-retry-assets.sh
+        ./scripts/smart-retry-assets.sh
+    elif [ -f "scripts/download-assets.sh" ]; then
+        log_info "Using standard asset download..."
         ./scripts/download-assets.sh
     else
-        log_warning "Asset download script not found"
+        log_warning "No asset download script found"
     fi
     
     cd ../..
